@@ -138,9 +138,16 @@ export default function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <span className="brand">
-          <span className="brand-mark" aria-hidden="true">●</span> clai <span className="brand-tag">usage &amp; cost</span>
-        </span>
+        <a className="brand" href="#/overview" aria-label="clai overview">
+          <span className="wordmark">clai</span>
+          <svg className="tally" width="14" height="16" viewBox="0 0 36 40" aria-hidden="true">
+            <line x1="5" y1="6" x2="5" y2="34" />
+            <line x1="13" y1="6" x2="13" y2="34" />
+            <line x1="21" y1="6" x2="21" y2="34" />
+            <line x1="29" y1="6" x2="29" y2="34" />
+            <line x1="1" y1="32" x2="34" y2="8" />
+          </svg>
+        </a>
         <nav className="nav" aria-label="Primary">
           {PAGES.map((p) => (
             <a key={p} href={buildHash(p, route.query)} className={`nav-link${route.page === p ? ' active' : ''}`} aria-current={route.page === p ? 'page' : undefined}>
@@ -149,12 +156,12 @@ export default function App() {
           ))}
         </nav>
         <div className="topbar-right">
-          <span className={`mode-badge${health.mode === 'team' ? ' team' : ''}`}>{health.mode}</span>
-          {whoami && <span className="whoami">{whoami.label || whoami.actorKey}</span>}
+          <span className="privacy-line">{health.mode === 'team' ? 'team · usage metadata only leaves this machine' : 'local · nothing leaves this machine'}</span>
+          {health.mode === 'team' && whoami && <span className="whoami">{whoami.label || whoami.actorKey}</span>}
         </div>
       </header>
 
-      <FilterBar filters={filters} onChange={updateFilters} projects={projects} mock={isMock()} />
+      <FilterBar filters={filters} onChange={updateFilters} projects={projects} mock={isMock()} timeZone={health.timeZone} />
 
       <main className="page-outlet">{renderPage(route.page, filters, health, emptyDb, filtersToQuery)}</main>
     </div>

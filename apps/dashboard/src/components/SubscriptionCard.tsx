@@ -1,27 +1,50 @@
 import type { SummaryResponse } from '../types';
+import { providerLabel } from '../colors';
 import { formatUsd } from '../format';
-import { InfoTip } from './InfoTip';
 
-const API_EQUIVALENT_HINT = "Usage covered by a subscription is valued at the provider's API list price so plans and pay-as-you-go can be compared.";
-
-/** "Claude Max 20x: $412 API-equivalent this month = 2.1x its $200 price." */
+/** A receipt: plan price, API-priced work, the multiple, and the basis. */
 export function SubscriptionCard({ row }: { row: SummaryResponse['subscriptions'][number] }) {
-  const { subscription, mtdUsd, projectedUsd, multiple } = row;
-  const label = subscription.label ?? `${subscription.provider} ${subscription.plan}`;
-  const basis = projectedUsd || mtdUsd;
+  const { subscription, mtdUsd, projectedUsd, lastMonthUsd, multiple } = row;
+  const label = subscription.label ?? `${providerLabel(subscription.provider)} ${subscription.plan}`;
+  const work = projectedUsd || mtdUsd;
   return (
-    <div className="sub-card">
-      <div className="flex-between">
-        <span className="sub-name">{label}</span>
-        <InfoTip text={API_EQUIVALENT_HINT} />
+    <div className="receipt">
+      <div className="receipt-edge top" aria-hidden="true" />
+      <div className="receipt-body">
+        <div className="receipt-row muted">
+          <span>{label}</span>
+          <span>{projectedUsd ? 'this month · projected' : 'this month'}</span>
+        </div>
+        <div className="receipt-rule" />
+        <div className="receipt-row">
+          <span>plan price</span>
+          <span>{formatUsd(subscription.priceMonthly)}</span>
+        </div>
+        <div className="receipt-row">
+          <span>API-priced work</span>
+          <span className="strong">{formatUsd(work)}</span>
+        </div>
+        <div className="receipt-row total">
+          <span>its price ×</span>
+          <span className="receipt-multiple">{multiple.toFixed(1)}x</span>
+        </div>
+        <div className="receipt-rule" />
+        <div className="receipt-row muted">
+          <span>month to date</span>
+          <span>{formatUsd(mtdUsd)}</span>
+        </div>
+        {lastMonthUsd > 0 && (
+          <div className="receipt-row muted">
+            <span>last month</span>
+            <span>{formatUsd(lastMonthUsd)}</span>
+          </div>
+        )}
+        <div className="receipt-row muted">
+          <span>basis</span>
+          <span>computed (API-equivalent)</span>
+        </div>
       </div>
-      <div className="sub-headline">
-        {formatUsd(basis)} <span className="mult">API-equivalent</span>
-      </div>
-      <p className="sub-sub">
-        this month = <strong className="tabular">{multiple.toFixed(1)}x</strong> its {formatUsd(subscription.priceMonthly)} price
-      </p>
-      <p className="sub-sub muted">{formatUsd(mtdUsd)} month-to-date</p>
+      <div className="receipt-edge bottom" aria-hidden="true" />
     </div>
   );
 }

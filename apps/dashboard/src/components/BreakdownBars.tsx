@@ -7,38 +7,63 @@ interface Props {
   labelFor?: (key: string) => string;
   limit?: number;
   metric?: 'usd' | 'events';
+  /** Keys that are always listed; missing ones show "no source". */
+  known?: string[];
+  entity?: string;
+  valueHeader?: string;
+  /** Draw a share bar under each name (one color per entity, never a value ramp). */
+  bars?: boolean;
 }
 
-/** A ranked meter-bar list — ordinal magnitude compare, one color per entity (never a value-ramp on the row). */
-export function BreakdownBars({ rows, colorFor, labelFor, limit = 8, metric = 'usd' }: Props) {
+/** A ledger: ink top rule, dashed row rules, mono tabular figures, amounts right-aligned, no zebra. */
+export function BreakdownBars({ rows, colorFor, labelFor, limit = 8, metric = 'usd', known = [], entity = 'name', valueHeader = 'spend', bars = false }: Props) {
   const shown = rows.slice(0, limit);
-  if (shown.length === 0) return <div className="no-data">No data in this range.</div>;
-  const max = Math.max(...shown.map((r) => (metric === 'usd' ? r.usd : r.events)), 1);
+  const missing = known.filter((k) => !rows.some((r) => r.key === k));
+  if (shown.length === 0 && missing.length === 0) return <div className="no-data">No data in this range.</div>;
+  const label = (k: string) => (labelFor ? labelFor(k) : k);
   return (
-    <div className="breakdown-list">
-      {shown.map((r) => {
-        const value = metric === 'usd' ? r.usd : r.events;
-        const widthPct = Math.max(2, (value / max) * 100);
-        const color = colorFor(r.key);
-        const label = labelFor ? labelFor(r.key) : r.key;
-        return (
-          <div className="breakdown-row" key={r.key}>
-            <div className="bd-label-row">
-              <span className="bd-label" title={label}>
-                <span className="bd-dot" style={{ background: color }} aria-hidden="true" />
-                {label}
+    <table className="ledger">
+      <thead>
+        <tr>
+          <th>{entity}</th>
+          <th className="num">requests</th>
+          <th className="num">share</th>
+          <th className="num">{valueHeader}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {shown.map((r) => (
+          <tr key={r.key}>
+            <td>
+              <span className="ledger-name" title={label(r.key)}>
+                <span className="swatch" style={{ background: colorFor(r.key) }} aria-hidden="true" />
+                {label(r.key)}
               </span>
-              <span className="bd-usd">
-                {metric === 'usd' ? formatUsd(r.usd) : formatInt(r.events)}
-                <span className="mute2">· {formatPct(r.share)}</span>
+              {bars && (
+                <span className="share-bar">
+                  <span className="share-fill" style={{ width: `${Math.max(1, r.share * 100)}%`, background: colorFor(r.key) }} />
+                </span>
+              )}
+            </td>
+            <td className="num">{formatInt(r.usage.requests || r.events)}</td>
+            <td className="num">{formatPct(r.share)}</td>
+            <td className="num strong">{metric === 'usd' ? formatUsd(r.usd) : formatInt(r.events)}</td>
+          </tr>
+        ))}
+        {missing.map((k) => (
+          <tr key={k} className="muted-row">
+            <td>
+              <span className="ledger-name">
+                <span className="swatch" style={{ background: colorFor(k) }} aria-hidden="true" />
+                {label(k)}
               </span>
-            </div>
-            <div className="bd-track">
-              <div className="bd-fill" style={{ width: `${widthPct}%`, background: color }} />
-            </div>
-          </div>
-        );
-      })}
-    </div>
+            </td>
+            <td className="num">no source</td>
+            <td className="num">—</td>
+            <td className="num">—</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

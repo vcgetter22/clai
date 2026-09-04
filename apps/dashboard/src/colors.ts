@@ -1,35 +1,47 @@
 /**
- * Stable entity -> categorical-slot color mapping. Slots are the eight validated
- * hues from the dataviz palette (see styles.css `--series-1..8`), always assigned in
- * the SAME fixed order regardless of which entities are present in a given filtered
- * view — so "Anthropic is blue" stays true everywhere it appears (daily chart,
- * breakdown lists, model chart), never repainted by rank or by what a filter hides.
- *
- * Known, product-relevant identities get their own reserved slot; anything else folds
- * into slot 8 ("Other") rather than generating a new hue.
+ * One color per provider, held constant everywhere it appears (daily chart, ledgers, model
+ * rows). Models take their provider's color, so "Anthropic is ledger green" stays true for
+ * Opus and Sonnet alike; anything unknown falls back to muted rather than a new hue.
  */
 
-const PROVIDER_ORDER = ['anthropic', 'openai', 'google', 'cursor', 'github', 'xai', 'mistral'];
-const MODEL_ORDER = ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5', 'gpt-5-codex', 'gemini-2.5-flash', 'claude-opus-4-1', 'claude-sonnet-4'];
+const PROVIDER_VARS: Record<string, string> = {
+  anthropic: '--series-anthropic',
+  openai: '--series-openai',
+  google: '--series-google',
+  cursor: '--series-cursor',
+  github: '--series-github',
+  xai: '--series-xai',
+  mistral: '--series-mistral',
+};
 
-function slotVar(order: string[], key: string): string {
-  const idx = order.indexOf(key);
-  const slot = idx === -1 ? 8 : idx + 1;
-  return `var(--series-${slot})`;
-}
+/** Providers the overview always lists, with "no source" when nothing has been connected. */
+export const KNOWN_PROVIDERS = ['anthropic', 'openai', 'google', 'cursor', 'github'];
 
 export function providerColor(provider: string): string {
-  return slotVar(PROVIDER_ORDER, provider);
+  const v = PROVIDER_VARS[provider];
+  return v ? `var(${v})` : 'var(--muted)';
+}
+
+export function modelProvider(modelKey: string): string {
+  const k = modelKey.toLowerCase();
+  if (k.startsWith('claude')) return 'anthropic';
+  if (/^(gpt|o[1-9]|codex|chatgpt|text-embedding|davinci)/.test(k)) return 'openai';
+  if (k.startsWith('gemini') || k.startsWith('models/')) return 'google';
+  if (k.includes('cursor')) return 'cursor';
+  if (k.includes('copilot')) return 'github';
+  if (k.startsWith('grok')) return 'xai';
+  if (/^(mistral|mixtral|codestral|ministral|magistral|devstral)/.test(k)) return 'mistral';
+  return 'other';
 }
 
 export function modelColor(modelKey: string): string {
-  return slotVar(MODEL_ORDER, modelKey);
+  return providerColor(modelProvider(modelKey));
 }
 
 /** The single accent used for "one series, one color" ranked lists (arbitrary categories like project names). */
-export const ACCENT = 'var(--series-1)';
+export const ACCENT = 'var(--accent)';
 
-export const DEEMPHASIS = 'var(--text-muted)';
+export const DEEMPHASIS = 'var(--muted)';
 
 export function providerLabel(provider: string): string {
   const known: Record<string, string> = {

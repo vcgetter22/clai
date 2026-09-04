@@ -1,24 +1,22 @@
 import type { Insight } from '../types';
 import { formatUsd } from '../format';
 
+/** Number-first sentence on the left, the figure and its basis on the right. */
 export function InsightCard({ insight }: { insight: Insight }) {
+  const saving = typeof insight.impactUsdPerMonth === 'number' && insight.impactUsdPerMonth > 0 ? insight.impactUsdPerMonth : null;
+  const tone = insight.severity === 'critical' ? 'red' : insight.severity === 'opportunity' ? 'accent' : 'ink';
   return (
     <div className={`insight-card ${insight.severity}`}>
-      <div className="insight-bar" aria-hidden="true" />
-      <div className="insight-body">
-        <div className="insight-top">
-          <div>
-            <div className="insight-title">{insight.title}</div>
-            <div className="insight-detail">{insight.detail}</div>
-          </div>
-          {typeof insight.impactUsdPerMonth === 'number' && insight.impactUsdPerMonth > 0 && <span className="impact-chip">{formatUsd(insight.impactUsdPerMonth)}/mo</span>}
-        </div>
-        {insight.action && <div className="insight-action">{insight.action}</div>}
+      <div className="insight-text">
+        <p className="insight-sentence">{insight.title}</p>
+        {insight.detail && <p className="insight-detail">{insight.detail}</p>}
+        {insight.action && <p className="insight-action">{insight.action}</p>}
         <details className="insight-evidence">
-          <summary>Evidence</summary>
+          <summary>evidence</summary>
           <pre>{JSON.stringify(insight.evidence, null, 2)}</pre>
         </details>
       </div>
+      {saving !== null && <span className={`insight-figure ${tone}`}>−{formatUsd(saving)} / mo · estimated</span>}
     </div>
   );
 }
