@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { serve, type ServerType } from '@hono/node-server';
 import type { PricingCatalog } from '@claii/core';
 import type { EventStore } from '@claii/store';
-import { createApi, createToken } from './api.js';
+import { createApi, createToken, tokenHash } from './api.js';
 import { runAllApiPulls, runLocalScan, type RunResult, type RunnerOptions } from './runner.js';
 import { dashboardDistDir, serveDashboard } from './static.js';
 
@@ -56,7 +56,6 @@ export function bootstrapTeam(store: EventStore, env: NodeJS.ProcessEnv = proces
   const provided = env['CLAI_ADMIN_TOKEN'];
   if (provided) {
     // Register the provided token verbatim for a reproducible bootstrap (docker/compose setups).
-    const { tokenHash } = require('./api.js') as typeof import('./api.js');
     store.db
       .prepare('INSERT INTO api_tokens(token_hash, actor_key, label, role, created_at) VALUES (:h, :a, :l, :r, :now)')
       .run({ h: tokenHash(provided), a: env['CLAI_ADMIN_EMAIL'] ?? 'admin', l: 'bootstrap admin', r: 'admin', now: new Date().toISOString() });

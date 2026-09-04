@@ -1,7 +1,7 @@
 # Releasing clai
 
 ## Before the first publish
-1. Claim the npm organization `clai` (the bare package name `clai` belongs to an unrelated React library). Fallback names if the org is unavailable: `clai-cli`, `clai-server`, `clai-dashboard`, with the binary still called `clai`.
+1. The npm organization is `claii` (the bare `clai` name belongs to an unrelated React library); packages are `@claii/*` and the binary is still called `clai`.
 2. Add `"publishConfig": { "access": "public" }` to each scoped package (required for public scoped packages).
 3. Pick a version and set it in every workspace `package.json` and every internal dependency (`"@claii/core": "0.1.0"`); a small script or `npm version --workspaces` keeps them aligned.
 4. `npm install && npm run build && npm test`; run `node apps/cli/bin/clai.js scan` against your own machine and compare with `clai doctor`.

@@ -28,3 +28,6 @@ From the pricing benchmarks (Raycast Pro $8-10, Helicone Team $799 flat, Langfus
 
 ## 2026-09-03: Team server is the same code as the CLI
 One engine, one schema, one API contract (`docs/dashboard-api.md`) for local and team modes; the hosted service is the team server on Postgres with billing. Avoids the "two products, two data models" failure mode the competitive analysis identified.
+
+## 2026-09-04: Hosted service architecture
+The hosted Plus/Team service is the team server on Postgres (Supabase, eu-central-1) behind one Vercel function (fra1) with the dashboard served same-origin; Stripe Payment Link first, entitlement only by webhook. In this repo that means: one uniformly async `EventStore` interface with `SqliteEventStore` behind `@claii/store/sqlite` (first published as 0.2.0), team-server SQL moved into store methods, `createApi` taking a principal resolver and public-route allowlist, and a device-code `clai login`. Tenant isolation, billing, retention and auth details are recorded in the private `clai-cloud` repository (`docs/decisions.md` there). Found while planning and fixed the same day: `bootstrapTeam` used `require()` in an ES module, so every `CLAI_ADMIN_TOKEN` start crashed.
