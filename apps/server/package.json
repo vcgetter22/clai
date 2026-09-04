@@ -33,5 +33,8 @@
     "type": "git",
     "url": "https://github.com/vcgetter22/clai"
   },
-  "homepage": "https://github.com/vcgetter22/clai#readme"
+  "homepage": "https://github.com/vcgetter22/clai#readme",
+  "bugs": {
+    "url": "https://github.com/vcgetter22/clai/issues"
+  }
 }
