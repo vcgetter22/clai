@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "incremental": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@claii/core": ["packages/core/src/index.ts"],
+      "@claii/store": ["packages/store/src/index.ts"],
+      "@claii/connectors": ["packages/connectors/src/index.ts"],
+      "@claii/server": ["apps/server/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts", "packages/core/src/**/*.json", "apps/server/src/**/*.ts", "apps/cli/src/**/*.ts"],
+  "exclude": ["**/*.test.ts", "**/dist/**", "apps/dashboard/**"]
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@claii/server",
+  "version": "0.1.0",
+  "description": "clai team server: receives synced usage from clai CLIs, pulls org connectors, serves the team dashboard and API.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "clai-server": "./bin/clai-server.js"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@claii/connectors": "0.1.0",
+    "@claii/core": "0.1.0",
+    "@claii/dashboard": "0.1.0",
+    "@claii/store": "0.1.0",
+    "@hono/node-server": "^1.14.0",
+    "hono": "^4.9.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vcgetter22/clai"
+  },
+  "homepage": "https://github.com/vcgetter22/clai#readme"
+}

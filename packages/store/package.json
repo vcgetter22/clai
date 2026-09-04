@@ -1,0 +1,32 @@
+{
+  "name": "@claii/store",
+  "version": "0.1.0",
+  "description": "clai storage: SQLite (node:sqlite) event store, aggregations and settings.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@claii/core": "0.1.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vcgetter22/clai"
+  },
+  "homepage": "https://github.com/vcgetter22/clai#readme"
+}

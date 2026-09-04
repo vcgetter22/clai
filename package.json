@@ -1,0 +1,29 @@
+{
+  "name": "clai-monorepo",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "clai — the single source of truth for AI usage and cost across Claude, ChatGPT, Codex, Gemini, Cursor, Copilot and your APIs.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "tsc -b packages/core packages/store packages/connectors apps/cli apps/server && npm run build -w @claii/dashboard",
+    "build:libs": "tsc -b packages/core packages/store packages/connectors apps/cli apps/server",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clai": "node apps/cli/bin/clai.js",
+    "clean": "rm -rf packages/*/dist apps/*/dist packages/*/tsconfig.tsbuildinfo apps/*/tsconfig.tsbuildinfo",
+    "typecheck:all": "tsc -p tsconfig.check.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

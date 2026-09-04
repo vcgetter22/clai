@@ -1,0 +1,24 @@
+services:
+  clai:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      CLAI_HOME: /var/lib/clai
+      CLAI_TZ: Europe/Berlin
+      # Optional: fix the bootstrap admin token instead of reading it from the first-start logs
+      # CLAI_ADMIN_TOKEN: clai_adm_change-me
+      CLAI_ADMIN_EMAIL: admin@example.com
+      CLAI_PULL_INTERVAL_MINUTES: "60"
+      # Provider credentials for scheduled pulls (or put them in /var/lib/clai/credentials.json)
+      # ANTHROPIC_ADMIN_KEY: sk-ant-admin...
+      # OPENAI_ADMIN_KEY: sk-admin-...
+      # OPENROUTER_API_KEY: sk-or-...
+      # CURSOR_API_KEY: key_...
+      # GITHUB_TOKEN: ghp_...
+    volumes:
+      - clai-data:/var/lib/clai
+    restart: unless-stopped
+
+volumes:
+  clai-data:
