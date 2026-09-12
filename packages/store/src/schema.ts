@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -101,7 +101,8 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   role TEXT NOT NULL DEFAULT 'member',
   created_at TEXT NOT NULL,
   last_used_at TEXT,
-  revoked_at TEXT
+  revoked_at TEXT,
+  expires_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS members (

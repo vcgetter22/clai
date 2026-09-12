@@ -7,8 +7,6 @@ import {
   emptyUsage,
   localTimeZone,
   repriceEvent,
-  type AggRow,
-  type BillingMode,
   type Budget,
   type DeclaredSubscription,
   type PricingCatalog,
@@ -16,39 +14,30 @@ import {
   type Seat,
   type SourceId,
   type Surface,
-  type TokenUsage,
   type UsageEvent,
 } from '@claii/core';
+import type {
+  ActorRow,
+  EventFilter,
+  EventStore,
+  InsertTokenInput,
+  MemberInfo,
+  Role,
+  SessionRow,
+  SourceRow,
+  SqlValue,
+  StoreOptions,
+  TokenInfo,
+  TokenListItem,
+  TotalRow,
+  TotalsRow,
+  UpsertMemberInput,
+  UpsertResult,
+} from './interface.js';
 import { SCHEMA_SQL, SCHEMA_VERSION } from './schema.js';
 
-export interface EventFilter {
-  /** ISO lower bound (inclusive) on ts. */
-  since?: string | null;
-  /** ISO upper bound (exclusive) on ts. */
-  until?: string | null;
-  /** Local day key lower bound (inclusive). Prefer over `since` for calendar reports. */
-  fromDay?: string;
-  toDay?: string;
-  provider?: ProviderId | ProviderId[];
-  source?: SourceId | SourceId[];
-  project?: string;
-  actorKey?: string;
-  sessionId?: string;
-  billing?: BillingMode;
-  surface?: Surface;
-  model?: string;
-}
-
-export interface StoreOptions {
-  timeZone?: string;
-  readonly?: boolean;
-}
-
-export interface UpsertResult {
-  inserted: number;
-  updated: number;
-  unchanged: number;
-}
+/** Throttle window for `touchToken`'s `last_used_at` write. */
+const TOUCH_THROTTLE_MS = 5 * 60_000;
 
 type Row = Record<string, SQLInputValue>;
 
@@ -127,7 +116,7 @@ const USAGE_SUMS = `
   MAX(CASE WHEN model_key IS NULL THEN 1 ELSE 0 END) AS unpriced
 `;
 
-function usageFromRow(r: Row): TokenUsage {
+function usageFromRow(r: Row) {
   return {
     input: Number(r['input_tokens'] ?? 0),
     output: Number(r['output_tokens'] ?? 0),
@@ -151,7 +140,18 @@ function costFromRow(r: Row): { computedUsd: number; billedUsd: number | null } 
   return { computedUsd: computed, billedUsd: billed !== null && billedRows === events ? billed : null };
 }
 
-export class EventStore {
+function roleOf(v: unknown): Role {
+  return v === 'admin' ? 'admin' : 'member';
+}
+
+/**
+ * SQLite implementation of `EventStore` (`node:sqlite`), used by the CLI, the local dashboard
+ * and the self-hosted team server. Its constructor stays synchronous; every method returns a
+ * Promise to satisfy the interface, but the work underneath is the same synchronous SQLite call
+ * as before. Import from `@claii/store/sqlite` — the root `@claii/store` export never loads
+ * `node:sqlite`.
+ */
+export class SqliteEventStore implements EventStore {
   readonly db: DatabaseSync;
   readonly path: string;
   timeZone: string;
@@ -165,30 +165,39 @@ export class EventStore {
       this.db.exec('PRAGMA synchronous = NORMAL');
       this.db.exec('PRAGMA foreign_keys = ON');
       this.db.exec(SCHEMA_SQL);
-      const v = this.getMeta('schema_version');
-      if (!v) this.setMeta('schema_version', String(SCHEMA_VERSION));
+      this.migrate();
+      const v = this.getMetaSync('schema_version');
+      if (!v || Number(v) < SCHEMA_VERSION) this.setMetaSync('schema_version', String(SCHEMA_VERSION));
     }
-    const tz = opts.timeZone ?? this.getSetting('timezone') ?? localTimeZone();
+    const tz = opts.timeZone ?? this.getSettingSync('timezone') ?? localTimeZone();
     this.timeZone = tz;
-    if (!opts.readonly && !this.getSetting('timezone')) this.setSetting('timezone', tz);
+    if (!opts.readonly && !this.getSettingSync('timezone')) this.setSettingSync('timezone', tz);
   }
 
-  close(): void {
+  /** Additive, migration-safe schema changes for databases created before a column existed. */
+  private migrate(): void {
+    const cols = this.db.prepare('PRAGMA table_info(api_tokens)').all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'expires_at')) {
+      this.db.exec('ALTER TABLE api_tokens ADD COLUMN expires_at TEXT');
+    }
+  }
+
+  async close(): Promise<void> {
     this.db.close();
   }
 
   // ------------------------------------------------------------ meta/settings
 
-  getMeta(key: string): string | undefined {
+  private getMetaSync(key: string): string | undefined {
     const r = this.db.prepare('SELECT value FROM meta WHERE key = :key').get({ key }) as Row | undefined;
     return r ? String(r['value']) : undefined;
   }
 
-  setMeta(key: string, value: string): void {
+  private setMetaSync(key: string, value: string): void {
     this.db.prepare('INSERT INTO meta(key, value) VALUES (:key, :value) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run({ key, value });
   }
 
-  getSetting(key: string): string | undefined {
+  private getSettingSync(key: string): string | undefined {
     try {
       const r = this.db.prepare('SELECT value FROM settings WHERE key = :key').get({ key }) as Row | undefined;
       return r ? String(r['value']) : undefined;
@@ -197,14 +206,22 @@ export class EventStore {
     }
   }
 
-  setSetting(key: string, value: string): void {
+  private setSettingSync(key: string, value: string): void {
     this.db
       .prepare('INSERT INTO settings(key, value, updated_at) VALUES (:key, :value, :now) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at')
       .run({ key, value, now: new Date().toISOString() });
   }
 
-  getJsonSetting<T>(key: string): T | undefined {
-    const v = this.getSetting(key);
+  async getSetting(key: string): Promise<string | undefined> {
+    return this.getSettingSync(key);
+  }
+
+  async setSetting(key: string, value: string): Promise<void> {
+    this.setSettingSync(key, value);
+  }
+
+  async getJsonSetting<T>(key: string): Promise<T | undefined> {
+    const v = this.getSettingSync(key);
     if (v === undefined) return undefined;
     try {
       return JSON.parse(v) as T;
@@ -213,23 +230,23 @@ export class EventStore {
     }
   }
 
-  setJsonSetting(key: string, value: unknown): void {
-    this.setSetting(key, JSON.stringify(value));
+  async setJsonSetting(key: string, value: unknown): Promise<void> {
+    this.setSettingSync(key, JSON.stringify(value));
   }
 
-  allSettings(): Record<string, string> {
+  async allSettings(): Promise<Record<string, string>> {
     const rows = this.db.prepare('SELECT key, value FROM settings ORDER BY key').all() as Row[];
     return Object.fromEntries(rows.map((r) => [String(r['key']), String(r['value'])]));
   }
 
   // ----------------------------------------------------------- source state
 
-  getState(source: string, key: string): string | undefined {
+  async getState(source: string, key: string): Promise<string | undefined> {
     const r = this.db.prepare('SELECT value FROM source_state WHERE source = :source AND key = :key').get({ source, key }) as Row | undefined;
     return r ? String(r['value']) : undefined;
   }
 
-  setState(source: string, key: string, value: string): void {
+  async setState(source: string, key: string, value: string): Promise<void> {
     this.db
       .prepare(
         'INSERT INTO source_state(source, key, value, updated_at) VALUES (:source, :key, :value, :now) ON CONFLICT(source, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
@@ -237,17 +254,35 @@ export class EventStore {
       .run({ source, key, value, now: new Date().toISOString() });
   }
 
-  clearState(source: string): void {
+  async clearState(source: string): Promise<void> {
     this.db.prepare('DELETE FROM source_state WHERE source = :source').run({ source });
   }
 
-  stateFor(source: string): { get: (k: string) => string | undefined; set: (k: string, v: string) => void } {
-    return { get: (k) => this.getState(source, k), set: (k, v) => this.setState(source, k, v) };
+  async loadState(source: string): Promise<Map<string, string>> {
+    const rows = this.db.prepare('SELECT key, value FROM source_state WHERE source = :source').all({ source }) as Row[];
+    return new Map(rows.map((r) => [String(r['key']), String(r['value'])]));
+  }
+
+  async saveState(source: string, values: Record<string, string>): Promise<void> {
+    const entries = Object.entries(values);
+    if (entries.length === 0) return;
+    const upsert = this.db.prepare(
+      'INSERT INTO source_state(source, key, value, updated_at) VALUES (:source, :key, :value, :now) ON CONFLICT(source, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+    );
+    const now = new Date().toISOString();
+    this.db.exec('BEGIN');
+    try {
+      for (const [key, value] of entries) upsert.run({ source, key, value, now });
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   // ------------------------------------------------------------------ events
 
-  upsertEvents(events: Iterable<UsageEvent>, origin?: string): UpsertResult {
+  async upsertEvents(events: Iterable<UsageEvent>, origin?: string): Promise<UpsertResult> {
     const insert = this.db.prepare(`
       INSERT INTO events (
         id, ts, day, source, provider, model, model_key, surface, billing, plan, granularity, period_end,
@@ -330,26 +365,24 @@ export class EventStore {
       this.db.exec('ROLLBACK');
       throw err;
     }
-    return { inserted, updated, unchanged };
+    return { inserted, updated, unchanged, dropped: 0 };
   }
 
-  countEvents(filter: EventFilter = {}): number {
+  async countEvents(filter: EventFilter = {}): Promise<number> {
     const params: Record<string, SQLInputValue> = {};
     const where = whereClause(filter, params);
     const r = this.db.prepare(`SELECT COUNT(*) AS n FROM events ${where}`).get(params) as Row;
     return Number(r['n']);
   }
 
-  /** Earliest and latest event timestamps. */
-  span(filter: EventFilter = {}): { first: string | null; last: string | null } {
+  async span(filter: EventFilter = {}): Promise<{ first: string | null; last: string | null }> {
     const params: Record<string, SQLInputValue> = {};
     const where = whereClause(filter, params);
     const r = this.db.prepare(`SELECT MIN(ts) AS first, MAX(ts) AS last FROM events ${where}`).get(params) as Row;
     return { first: (r['first'] as string | null) ?? null, last: (r['last'] as string | null) ?? null };
   }
 
-  /** The aggregate rows consumed by the insights engine and reports. */
-  rows(filter: EventFilter = {}, opts: { bySession?: boolean } = {}): AggRow[] {
+  async rows(filter: EventFilter = {}, opts: { bySession?: boolean } = {}) {
     const params: Record<string, SQLInputValue> = {};
     const where = whereClause(filter, params);
     const sessionCol = opts.bySession === false ? 'NULL' : 'session_id';
@@ -360,7 +393,7 @@ export class EventStore {
       GROUP BY day, provider, COALESCE(model_key, model), source, surface, billing, plan, actor_key, project, ${sessionCol}
       ORDER BY day
     `;
-    const out: AggRow[] = [];
+    const out = [];
     for (const r of this.db.prepare(sql).all(params) as Row[]) {
       const cost = costFromRow(r);
       out.push({
@@ -369,7 +402,7 @@ export class EventStore {
         model: String(r['model']),
         source: String(r['source']) as SourceId,
         surface: String(r['surface']) as Surface,
-        billing: String(r['billing']) as BillingMode,
+        billing: String(r['billing']) as UsageEvent['billing'],
         plan: (r['plan'] as string | null) ?? null,
         actorKey: String(r['actor_key']),
         project: (r['project'] as string | null) ?? null,
@@ -386,8 +419,11 @@ export class EventStore {
     return out;
   }
 
-  /** Totals grouped by one dimension. */
-  totalsBy(dim: 'day' | 'month' | 'provider' | 'model' | 'source' | 'project' | 'actor_key' | 'surface' | 'billing' | 'plan' | 'session_id', filter: EventFilter = {}, limit = 1000) {
+  async totalsBy(
+    dim: 'day' | 'month' | 'provider' | 'model' | 'source' | 'project' | 'actor_key' | 'surface' | 'billing' | 'plan' | 'session_id',
+    filter: EventFilter = {},
+    limit = 1000,
+  ): Promise<TotalsRow[]> {
     const params: Record<string, SQLInputValue> = {};
     const where = whereClause(filter, params);
     const col = dim === 'model' ? 'COALESCE(model_key, model)' : dim === 'month' ? 'substr(day, 1, 7)' : dim;
@@ -406,8 +442,7 @@ export class EventStore {
     });
   }
 
-  /** Grand total for a filter. */
-  total(filter: EventFilter = {}) {
+  async total(filter: EventFilter = {}): Promise<TotalRow> {
     const params: Record<string, SQLInputValue> = {};
     const where = whereClause(filter, params);
     const r = this.db.prepare(`SELECT ${USAGE_SUMS} FROM events ${where}`).get(params) as Row;
@@ -415,8 +450,7 @@ export class EventStore {
     return { usage: usageFromRow(r), computedUsd: cost.computedUsd, billedUsd: cost.billedUsd, usd: cost.billedUsd ?? cost.computedUsd, events: Number(r['events'] ?? 0) };
   }
 
-  /** Session list with cost, ordered by cost. */
-  sessions(filter: EventFilter = {}, limit = 50) {
+  async sessions(filter: EventFilter = {}, limit = 50): Promise<SessionRow[]> {
     const params: Record<string, SQLInputValue> = {};
     const where = whereClause({ ...filter }, params);
     const sql = `
@@ -442,33 +476,31 @@ export class EventStore {
     });
   }
 
-  /** Raw events (most recent first). */
-  listEvents(filter: EventFilter = {}, limit = 100): UsageEvent[] {
+  async listEvents(filter: EventFilter = {}, limit = 100): Promise<UsageEvent[]> {
     const params: Record<string, SQLInputValue> = {};
     const where = whereClause(filter, params);
     const rows = this.db.prepare(`SELECT * FROM events ${where} ORDER BY ts DESC LIMIT ${Math.max(1, Math.floor(limit))}`).all(params) as Row[];
     return rows.map(rowToEvent);
   }
 
-  *iterateEvents(filter: EventFilter = {}): Generator<UsageEvent> {
+  async *iterateEvents(filter: EventFilter = {}): AsyncGenerator<UsageEvent> {
     const params: Record<string, SQLInputValue> = {};
     const where = whereClause(filter, params);
     for (const r of this.db.prepare(`SELECT * FROM events ${where} ORDER BY ts`).iterate(params) as Iterable<Row>) yield rowToEvent(r);
   }
 
-  /** Recompute computed costs with a new catalog (after `clai pricing update`). Returns number of changed rows. */
-  repriceAll(catalog: PricingCatalog): number {
-    const all = [...this.iterateEvents()];
+  async repriceAll(catalog: PricingCatalog): Promise<number> {
+    const all: UsageEvent[] = [];
+    for await (const e of this.iterateEvents()) all.push(e);
     const changed = all.map((e) => repriceEvent(e, catalog)).filter((e, i) => e.cost.computedUsd !== all[i]!.cost.computedUsd || e.modelKey !== all[i]!.modelKey);
     if (changed.length === 0) return 0;
-    const res = this.upsertEvents(changed);
+    const res = await this.upsertEvents(changed);
     return res.updated + res.inserted;
   }
 
-  /** Recompute the local `day` column after a timezone change. */
-  recomputeDays(timeZone: string): void {
+  async recomputeDays(timeZone: string): Promise<void> {
     this.timeZone = timeZone;
-    this.setSetting('timezone', timeZone);
+    await this.setSetting('timezone', timeZone);
     const upd = this.db.prepare('UPDATE events SET day = :day WHERE id = :id');
     this.db.exec('BEGIN');
     try {
@@ -482,64 +514,64 @@ export class EventStore {
     }
   }
 
-  deleteSource(source: SourceId): number {
+  async deleteSource(source: SourceId): Promise<number> {
     const r = this.db.prepare('DELETE FROM events WHERE source = :source').run({ source });
-    this.clearState(source);
+    await this.clearState(source);
     return Number(r.changes);
   }
 
   // ---------------------------------------------------- subscriptions etc.
 
-  listSubscriptions(): DeclaredSubscription[] {
+  async listSubscriptions(): Promise<DeclaredSubscription[]> {
     return (this.db.prepare('SELECT json FROM subscriptions ORDER BY id').all() as Row[]).map((r) => JSON.parse(String(r['json'])) as DeclaredSubscription);
   }
 
-  putSubscription(sub: DeclaredSubscription): void {
+  async putSubscription(sub: DeclaredSubscription): Promise<void> {
     this.db
       .prepare('INSERT INTO subscriptions(id, json, updated_at) VALUES (:id, :json, :now) ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at')
       .run({ id: sub.id, json: JSON.stringify(sub), now: new Date().toISOString() });
   }
 
-  deleteSubscription(id: string): boolean {
+  async deleteSubscription(id: string): Promise<boolean> {
     return Number(this.db.prepare('DELETE FROM subscriptions WHERE id = :id').run({ id }).changes) > 0;
   }
 
-  listBudgets(): Budget[] {
+  async listBudgets(): Promise<Budget[]> {
     return (this.db.prepare('SELECT json FROM budgets ORDER BY id').all() as Row[]).map((r) => JSON.parse(String(r['json'])) as Budget);
   }
 
-  putBudget(b: Budget): void {
+  async putBudget(b: Budget): Promise<void> {
     this.db
       .prepare('INSERT INTO budgets(id, json, updated_at) VALUES (:id, :json, :now) ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at')
       .run({ id: b.id, json: JSON.stringify(b), now: new Date().toISOString() });
   }
 
-  deleteBudget(id: string): boolean {
+  async deleteBudget(id: string): Promise<boolean> {
     return Number(this.db.prepare('DELETE FROM budgets WHERE id = :id').run({ id }).changes) > 0;
   }
 
-  listSeats(): Seat[] {
+  async listSeats(): Promise<Seat[]> {
     return (this.db.prepare('SELECT json FROM seats ORDER BY actor_key').all() as Row[]).map((r) => JSON.parse(String(r['json'])) as Seat);
   }
 
-  putSeat(s: Seat): void {
+  async putSeat(s: Seat): Promise<void> {
     this.db
       .prepare('INSERT INTO seats(actor_key, json, updated_at) VALUES (:k, :json, :now) ON CONFLICT(actor_key) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at')
       .run({ k: s.actorKey, json: JSON.stringify(s), now: new Date().toISOString() });
   }
 
-  deleteSeat(actorKey: string): boolean {
+  async deleteSeat(actorKey: string): Promise<boolean> {
     return Number(this.db.prepare('DELETE FROM seats WHERE actor_key = :k').run({ k: actorKey }).changes) > 0;
   }
 
   // ------------------------------------------------------------ ingest runs
 
-  startRun(source: string): number {
+  async startRun(source: string): Promise<number> {
     const r = this.db.prepare('INSERT INTO ingest_runs(source, started_at) VALUES (:source, :now)').run({ source, now: new Date().toISOString() });
     return Number(r.lastInsertRowid);
   }
 
-  finishRun(id: number, stats: { seen: number; inserted: number; updated: number; unpriced: number; error?: string }): void {
+  async finishRun(id: number, stats: { seen: number; inserted: number; updated: number; unpriced: number; error?: string }): Promise<void> {
     this.db
       .prepare(
         'UPDATE ingest_runs SET finished_at = :now, events_seen = :seen, events_inserted = :inserted, events_updated = :updated, unpriced = :unpriced, ok = :ok, error = :error WHERE id = :id',
@@ -547,12 +579,11 @@ export class EventStore {
       .run({ id, now: new Date().toISOString(), seen: stats.seen, inserted: stats.inserted, updated: stats.updated, unpriced: stats.unpriced, ok: stats.error ? 0 : 1, error: stats.error ?? null });
   }
 
-  lastRuns(limit = 20) {
-    return this.db.prepare(`SELECT * FROM ingest_runs ORDER BY id DESC LIMIT ${Math.max(1, Math.floor(limit))}`).all() as Row[];
+  async lastRuns(limit = 20): Promise<Record<string, SqlValue>[]> {
+    return this.db.prepare(`SELECT * FROM ingest_runs ORDER BY id DESC LIMIT ${Math.max(1, Math.floor(limit))}`).all() as Record<string, SqlValue>[];
   }
 
-  /** Distinct sources with counts and last event time. */
-  sources(): { source: SourceId; events: number; first: string; last: string }[] {
+  async sources(): Promise<SourceRow[]> {
     return (this.db.prepare('SELECT source, COUNT(*) AS n, MIN(ts) AS first, MAX(ts) AS last FROM events GROUP BY source ORDER BY n DESC').all() as Row[]).map((r) => ({
       source: String(r['source']) as SourceId,
       events: Number(r['n']),
@@ -561,8 +592,7 @@ export class EventStore {
     }));
   }
 
-  /** Distinct actors with last activity (team views). */
-  actors(filter: EventFilter = {}) {
+  async actors(filter: EventFilter = {}): Promise<ActorRow[]> {
     const params: Record<string, SQLInputValue> = {};
     const where = whereClause(filter, params);
     return (this.db.prepare(`SELECT actor_key, MIN(actor_json) AS actor_json, MAX(day) AS last_day, MIN(day) AS first_day, ${USAGE_SUMS} FROM events ${where} GROUP BY actor_key ORDER BY COALESCE(SUM(billed_usd), SUM(computed_usd)) DESC`).all(params) as Row[]).map((r) => {
@@ -578,6 +608,80 @@ export class EventStore {
       };
     });
   }
+
+  // --------------------------------------------------------- team: tokens/members
+
+  async countActiveTokens(): Promise<number> {
+    const r = this.db.prepare('SELECT COUNT(*) AS n FROM api_tokens WHERE revoked_at IS NULL').get() as Row;
+    return Number(r['n']);
+  }
+
+  async lookupToken(tokenHash: string): Promise<TokenInfo | null> {
+    const row = this.db
+      .prepare('SELECT actor_key, role, label, expires_at, last_used_at FROM api_tokens WHERE token_hash = :h AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > :now)')
+      .get({ h: tokenHash, now: new Date().toISOString() }) as Row | undefined;
+    if (!row) return null;
+    return {
+      actorKey: String(row['actor_key']),
+      role: roleOf(row['role']),
+      label: (row['label'] as string | null) ?? null,
+      expiresAt: (row['expires_at'] as string | null) ?? null,
+      lastUsedAt: (row['last_used_at'] as string | null) ?? null,
+    };
+  }
+
+  async touchToken(tokenHash: string): Promise<void> {
+    const row = this.db.prepare('SELECT last_used_at FROM api_tokens WHERE token_hash = :h').get({ h: tokenHash }) as Row | undefined;
+    if (!row) return;
+    const last = row['last_used_at'] as string | null;
+    const now = Date.now();
+    if (last && now - Date.parse(last) < TOUCH_THROTTLE_MS) return;
+    this.db.prepare('UPDATE api_tokens SET last_used_at = :now WHERE token_hash = :h').run({ h: tokenHash, now: new Date(now).toISOString() });
+  }
+
+  async insertToken(input: InsertTokenInput): Promise<void> {
+    this.db
+      .prepare('INSERT INTO api_tokens(token_hash, actor_key, label, role, created_at, expires_at) VALUES (:h, :a, :l, :r, :now, :exp)')
+      .run({ h: input.tokenHash, a: input.actorKey, l: input.label ?? null, r: input.role, now: new Date().toISOString(), exp: input.expiresAt ?? null });
+  }
+
+  async listTokens(): Promise<TokenListItem[]> {
+    const rows = this.db.prepare('SELECT token_hash, actor_key, label, role, created_at, last_used_at, revoked_at, expires_at FROM api_tokens ORDER BY created_at DESC').all() as Row[];
+    return rows.map((r) => ({
+      tokenHash: String(r['token_hash']),
+      actorKey: String(r['actor_key']),
+      role: roleOf(r['role']),
+      label: (r['label'] as string | null) ?? null,
+      createdAt: String(r['created_at']),
+      lastUsedAt: (r['last_used_at'] as string | null) ?? null,
+      revokedAt: (r['revoked_at'] as string | null) ?? null,
+      expiresAt: (r['expires_at'] as string | null) ?? null,
+    }));
+  }
+
+  async revokeToken(tokenHash: string): Promise<void> {
+    this.db.prepare('UPDATE api_tokens SET revoked_at = :now WHERE token_hash = :h').run({ h: tokenHash, now: new Date().toISOString() });
+  }
+
+  async listMembers(): Promise<MemberInfo[]> {
+    const rows = this.db.prepare('SELECT actor_key, display_name, team, role, created_at, updated_at FROM members ORDER BY actor_key').all() as Row[];
+    return rows.map((r) => ({
+      actorKey: String(r['actor_key']),
+      displayName: (r['display_name'] as string | null) ?? null,
+      team: (r['team'] as string | null) ?? null,
+      role: roleOf(r['role']),
+      createdAt: String(r['created_at']),
+      updatedAt: String(r['updated_at']),
+    }));
+  }
+
+  async upsertMember(input: UpsertMemberInput): Promise<void> {
+    this.db
+      .prepare(
+        'INSERT INTO members(actor_key, display_name, team, role, created_at, updated_at) VALUES (:a, :d, :t, :r, :now, :now) ON CONFLICT(actor_key) DO UPDATE SET display_name = COALESCE(excluded.display_name, members.display_name), team = COALESCE(excluded.team, members.team), role = excluded.role, updated_at = excluded.updated_at',
+      )
+      .run({ a: input.actorKey, d: input.displayName ?? null, t: input.team ?? null, r: input.role, now: new Date().toISOString() });
+  }
 }
 
 function rowToEvent(r: Row): UsageEvent {
@@ -589,7 +693,7 @@ function rowToEvent(r: Row): UsageEvent {
     model: String(r['model']),
     modelKey: (r['model_key'] as string | null) ?? null,
     surface: String(r['surface']) as Surface,
-    billing: String(r['billing']) as BillingMode,
+    billing: String(r['billing']) as UsageEvent['billing'],
     plan: (r['plan'] as string | null) ?? undefined,
     granularity: String(r['granularity']) as UsageEvent['granularity'],
     periodEnd: (r['period_end'] as string | null) ?? undefined,

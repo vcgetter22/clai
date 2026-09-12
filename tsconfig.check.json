@@ -12,6 +12,8 @@
     "paths": {
       "@claii/core": ["packages/core/src/index.ts"],
       "@claii/store": ["packages/store/src/index.ts"],
+      "@claii/store/sqlite": ["packages/store/src/sqlite.ts"],
+      "@claii/store/testing": ["packages/store/src/testing/conformance.ts"],
       "@claii/connectors": ["packages/connectors/src/index.ts"],
       "@claii/server": ["apps/server/src/index.ts"]
     }

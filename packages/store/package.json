@@ -1,7 +1,7 @@
 {
   "name": "@claii/store",
-  "version": "0.1.0",
-  "description": "clai storage: SQLite (node:sqlite) event store, aggregations and settings.",
+  "version": "0.2.0",
+  "description": "clai storage: the async EventStore interface, a SQLite (node:sqlite) implementation and an injected-primitive conformance suite.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,7 +9,16 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./sqlite": {
+      "types": "./dist/sqlite.d.ts",
+      "import": "./dist/sqlite.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/conformance.d.ts",
+      "import": "./dist/testing/conformance.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
@@ -18,7 +27,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@claii/core": "0.1.0"
+    "@claii/core": "0.2.0"
   },
   "license": "MIT",
   "publishConfig": {
