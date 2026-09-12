@@ -2,7 +2,8 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import type { PricingCatalog } from '@claii/core';
 import type { Logger } from '@claii/connectors';
-import { EventStore, defaultDbPath } from '@claii/store';
+import { defaultDbPath } from '@claii/store';
+import { SqliteEventStore } from '@claii/store/sqlite';
 import { loadCatalog, type RunnerOptions } from '@claii/server';
 import pc from 'picocolors';
 
@@ -14,7 +15,8 @@ export interface GlobalOptions {
 }
 
 export interface CliContext {
-  store: EventStore;
+  /** Concrete SQLite store, not the `EventStore` interface: the CLI is always local (`clai sync` talks HTTP to a team server), and `clai ask` needs the raw `db` handle. */
+  store: SqliteEventStore;
   catalog: PricingCatalog;
   catalogOverridden: boolean;
   env: NodeJS.ProcessEnv;
@@ -23,7 +25,7 @@ export interface CliContext {
   json: boolean;
   version: string;
   runner: RunnerOptions;
-  close: () => void;
+  close: () => Promise<void>;
 }
 
 export function cliVersion(): string {
@@ -54,7 +56,7 @@ export function makeLogger(opts: GlobalOptions): Logger {
 export function openContext(opts: GlobalOptions = {}): CliContext {
   const env = process.env;
   const dbPath = opts.db ?? defaultDbPath(env);
-  const store = new EventStore(dbPath, { timeZone: env['CLAI_TZ'] });
+  const store = new SqliteEventStore(dbPath, { timeZone: env['CLAI_TZ'] });
   const { catalog, overridden } = loadCatalog(env);
   const log = makeLogger(opts);
   const runner: RunnerOptions = { store, catalog, log, env, home: homedir() };

@@ -69,7 +69,7 @@ export function registerExport(program: Command): void {
         let n = 0;
         if (opts.format === 'csv') await write(COLUMNS.join(',') + '\n');
         if (opts.format === 'json') await write('[\n');
-        for (const e of ctx.store.iterateEvents(filter)) {
+        for await (const e of ctx.store.iterateEvents(filter)) {
           if (opts.format === 'csv') await write(rowOf(e, ctx.store.timeZone).map(csvCell).join(',') + '\n');
           else if (opts.format === 'jsonl') await write(JSON.stringify(e) + '\n');
           else await write((n ? ',\n' : '') + JSON.stringify(e));
@@ -81,7 +81,7 @@ export function registerExport(program: Command): void {
           console.error(ok(`wrote ${n} events to ${opts.out}`));
         }
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }

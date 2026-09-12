@@ -18,7 +18,7 @@ export function registerDoctor(program: Command): void {
         const lines: string[] = [];
         const nodeOk = Number(process.versions.node.split('.')[0]) >= 22;
         lines.push(nodeOk ? ok(`Node ${process.versions.node}`) : fail(`Node ${process.versions.node} (need >= 22.13 for built-in SQLite)`));
-        lines.push(ok(`Database ${ctx.store.path} (${ctx.store.countEvents()} events${existsSync(ctx.store.path) ? `, ${(statSync(ctx.store.path).size / 1e6).toFixed(1)} MB` : ''})`));
+        lines.push(ok(`Database ${ctx.store.path} (${await ctx.store.countEvents()} events${existsSync(ctx.store.path) ? `, ${(statSync(ctx.store.path).size / 1e6).toFixed(1)} MB` : ''})`));
         lines.push(ok(`Timezone ${ctx.store.timeZone}`));
         lines.push(ok(`Pricing catalog ${ctx.catalog.version} (${ctx.catalog.models.length} models${ctx.catalogOverridden ? ', overrides active' : ''})`));
         lines.push(dashboardDistDir() ? ok('Dashboard bundle found') : warn('Dashboard bundle missing (npm run build -w @claii/dashboard)'));
@@ -27,7 +27,7 @@ export function registerDoctor(program: Command): void {
 
         const local: unknown[] = [];
         for (const c of localConnectors as LocalConnector[]) {
-          const det = await c.detect(connectorContext(ctx.runner, c.id));
+          const det = await c.detect(await connectorContext(ctx.runner, c.id));
           local.push({ id: c.id, ...det });
           lines.push(det.found ? ok(`${c.displayName}: ${det.summary}`) : dim(`${c.displayName}: ${det.summary}`));
         }
@@ -47,7 +47,7 @@ export function registerDoctor(program: Command): void {
         let crossRows: string[][] = [];
         let anyCcCost = false;
         if (stats) {
-          const ours = ctx.store.totalsBy('model', { source: 'claude-code' }, 100);
+          const ours = await ctx.store.totalsBy('model', { source: 'claude-code' }, 100);
           crossRows = Object.entries(stats.modelUsage).map(([model, cc]) => {
             const key = resolveModel(ctx.catalog, model).price?.id ?? model;
             const mine = ours.find((o) => o.key === key || o.key === model);
@@ -71,7 +71,7 @@ export function registerDoctor(program: Command): void {
           if (!anyCcCost) console.log(dim('  Claude Code reports no cost in its stats cache on this machine; clai prices from its catalog.'));
         }
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }

@@ -45,7 +45,7 @@ export function registerImport(program: Command): void {
         if (connector.id === 'claude-export' && !opts.estimate) console.log(dim('  claude.ai exports carry no token counts or model; only message counts were imported. Add --estimate --model claude-sonnet-5 for an estimate.'));
         else console.log(dim('  Costs from exports are estimates (token counts are derived from text) and are labelled as such.'));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }

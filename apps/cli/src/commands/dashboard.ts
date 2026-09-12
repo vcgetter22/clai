@@ -51,7 +51,7 @@ export function registerDashboard(program: Command): void {
       if (opts.open) openBrowser(url);
       const shutdown = async () => {
         await close();
-        ctx.close();
+        await ctx.close();
         process.exit(0);
       };
       process.on('SIGINT', () => void shutdown());

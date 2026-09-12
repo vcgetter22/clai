@@ -17,7 +17,7 @@ export function registerPricing(program: Command): void {
     .command('list')
     .option('--provider <id>')
     .option('--all', 'include retired models', false)
-    .action((opts: { provider?: string; all: boolean }, cmd: Command) => {
+    .action(async (opts: { provider?: string; all: boolean }, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
         const models = ctx.catalog.models.filter((m) => (!opts.provider || m.provider === opts.provider) && (opts.all || !m.retired));
@@ -25,12 +25,12 @@ export function registerPricing(program: Command): void {
         console.log(heading(`Pricing catalog ${ctx.catalog.version}`) + dim(' (USD per 1M tokens)'));
         console.log(table(['provider', 'model', 'tier', 'input', 'cache read', 'cache write', 'output', 'ctx', 'status'], models.map((m) => [m.provider, m.id, m.tier, formatUsd(m.input), m.cacheRead === null ? '-' : formatUsd(m.cacheRead), m.cacheWrite5m === null ? '-' : formatUsd(m.cacheWrite5m), formatUsd(m.output), m.contextWindow ? `${Math.round(m.contextWindow / 1000)}k` : '-', m.retired ? dim('retired') : m.verified ? ok('verified') : warn('unverified')]), ['l', 'l', 'l', 'r', 'r', 'r', 'r', 'r', 'l']));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   pricing
     .command('show <model>')
-    .action((model: string, _o: unknown, cmd: Command) => {
+    .action(async (model: string, _o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
         const r = resolveModel(ctx.catalog, model);
@@ -54,7 +54,7 @@ export function registerPricing(program: Command): void {
           ['note', p.note ?? '-'],
         ]));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   pricing
@@ -68,7 +68,7 @@ export function registerPricing(program: Command): void {
     .option('--cache-write-1h <usd>')
     .option('--display <name>')
     .option('--tier <tier>', 'frontier | mid | small | embedding | other', 'mid')
-    .action((model: string, opts: { input: string; output: string; provider?: string; cacheRead?: string; cacheWrite5m?: string; cacheWrite1h?: string; display?: string; tier: string }, cmd: Command) => {
+    .action(async (model: string, opts: { input: string; output: string; provider?: string; cacheRead?: string; cacheWrite5m?: string; cacheWrite1h?: string; display?: string; tier: string }, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
         const path = pricingOverridePath(ctx.env);
@@ -96,34 +96,34 @@ export function registerPricing(program: Command): void {
         writeFileSync(path, JSON.stringify(override, null, 2));
         // Reprice with the merged catalog.
         const fresh = openContext({ ...(cmd.optsWithGlobals() as GlobalOptions), quiet: true });
-        const changed = fresh.store.repriceAll(fresh.catalog);
-        fresh.close();
+        const changed = await fresh.store.repriceAll(fresh.catalog);
+        await fresh.close();
         if (ctx.json) return printJson({ entry, path, repriced: changed });
         console.log(ok(`Saved ${entry.id} to ${path}; repriced ${changed} events.`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   pricing
     .command('reprice')
     .description('Recompute costs of all stored events with the current catalog')
-    .action((_o: unknown, cmd: Command) => {
+    .action(async (_o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
-        const n = ctx.store.repriceAll(ctx.catalog);
+        const n = await ctx.store.repriceAll(ctx.catalog);
         if (ctx.json) return printJson({ repriced: n });
         console.log(ok(`Repriced ${n} events with catalog ${ctx.catalog.version}.`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   pricing
     .command('check')
     .description('List models seen in your data that are unpriced or unverified')
-    .action((_o: unknown, cmd: Command) => {
+    .action(async (_o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
-        const used = ctx.store.totalsBy('model', {}, 500);
+        const used = await ctx.store.totalsBy('model', {}, 500);
         const rows = used.map((u) => {
           const r = resolveModel(ctx.catalog, u.key);
           return { model: u.key, events: u.events, usd: u.usd, status: r.match === 'synthetic' ? 'synthetic (free)' : !r.price ? 'UNPRICED' : r.price.verified ? 'verified' : 'unverified', match: r.match };
@@ -132,7 +132,7 @@ export function registerPricing(program: Command): void {
         console.log(heading('Pricing check'));
         console.log(table(['model', 'events', 'spend', 'status', 'match'], rows.map((r) => [r.model, String(r.events), formatUsd(r.usd), r.status === 'UNPRICED' ? warn(r.status) : r.status === 'unverified' ? warn(r.status) : ok(r.status), r.match]), ['l', 'r', 'r', 'l', 'l']));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }

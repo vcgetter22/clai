@@ -78,7 +78,7 @@ export function registerAsk(program: Command): void {
         console.log(answerText.trim());
         console.log(dim(`  (this question cost about ${formatUsd(cost)} on ${opts.model})`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }

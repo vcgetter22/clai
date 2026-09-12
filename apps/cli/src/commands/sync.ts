@@ -24,25 +24,25 @@ export function registerSync(program: Command): void {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
         const saved = readCredentialsFile(ctx.env)['sync'] ?? {};
-        const server = (opts.server ?? ctx.env['CLAI_SYNC_SERVER'] ?? ctx.store.getSetting('sync.server') ?? saved['server'])?.replace(/\/$/, '');
+        const server = (opts.server ?? ctx.env['CLAI_SYNC_SERVER'] ?? (await ctx.store.getSetting('sync.server')) ?? saved['server'])?.replace(/\/$/, '');
         const token = opts.token ?? ctx.env['CLAI_SYNC_TOKEN'] ?? saved['token'];
         if (!server) throw new Error('No server. Pass --server https://clai.example.com or set CLAI_SYNC_SERVER.');
         if (!token) throw new Error('No token. Pass --token (ask your clai admin) or set CLAI_SYNC_TOKEN.');
         if (opts.server || opts.token) writeCredentials('sync', { server, token }, ctx.env);
-        const last = ctx.store.getSetting('sync.last_ts');
+        const last = await ctx.store.getSetting('sync.last_ts');
         let since: string | null = null;
         if (!opts.all) {
           if (opts.since) since = parseSince(opts.since, new Date(), ctx.store.timeZone);
           else if (last) since = new Date(Date.parse(last) - 3 * 86400e3).toISOString(); // overlap: late-arriving events
         }
-        const events = [...ctx.store.iterateEvents(since ? { since } : {})].map((e) => (opts.keepPaths ? e : stripPaths(e)));
-        const batch = Math.max(1, Number(opts.batch) || 500);
+        const batchSize = Math.max(1, Number(opts.batch) || 500);
         let sent = 0;
         let inserted = 0;
         let updated = 0;
         let maxTs = last ?? '';
-        for (let i = 0; i < events.length; i += batch) {
-          const chunk = events.slice(i, i + batch);
+        let chunk: UsageEvent[] = [];
+        const sendChunk = async () => {
+          if (chunk.length === 0) return;
           const res = await fetch(`${server}/api/v1/ingest`, {
             method: 'POST',
             headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
@@ -57,9 +57,17 @@ export function registerSync(program: Command): void {
           inserted += r.inserted;
           updated += r.updated;
           for (const e of chunk) if (e.ts > maxTs) maxTs = e.ts;
-          ctx.log.debug(`sent ${sent}/${events.length}`);
+          ctx.log.debug(`sent ${sent}`);
+          chunk = [];
+        };
+        // Batch straight from the store's async iterator instead of materializing every event
+        // up front, so a first sync over a large store doesn't hold it all in memory at once.
+        for await (const e of ctx.store.iterateEvents(since ? { since } : {})) {
+          chunk.push(opts.keepPaths ? e : stripPaths(e));
+          if (chunk.length >= batchSize) await sendChunk();
         }
-        if (maxTs) ctx.store.setSetting('sync.last_ts', maxTs);
+        await sendChunk();
+        if (maxTs) await ctx.store.setSetting('sync.last_ts', maxTs);
         if (ctx.json) return printJson({ server, sent, inserted, updated, since });
         console.log(heading('clai sync'));
         console.log(ok(`sent ${sent} events to ${server} (${inserted} new, ${updated} updated on the server)`));
@@ -73,7 +81,7 @@ export function registerSync(program: Command): void {
         console.log(fail((err as Error).message));
         process.exitCode = 1;
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }

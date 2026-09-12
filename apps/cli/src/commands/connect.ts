@@ -47,7 +47,7 @@ export function registerConnect(program: Command): void {
           throw new Error(`Missing credentials for ${c.displayName}:\n${help.join('\n')}`);
         }
         if (opts.verify) {
-          const cctx = connectorContext(ctx.runner, c.id);
+          const cctx = await connectorContext(ctx.runner, c.id);
           const v = await c.verify(cctx, creds);
           if (ctx.json) return printJson({ connector: c.id, ok: v.ok, message: v.message });
           console.log(v.ok ? ok(`${c.displayName}: ${v.message}`) : fail(`${c.displayName}: ${v.message}`));
@@ -55,21 +55,21 @@ export function registerConnect(program: Command): void {
           else console.log(dim(`  Stored ${Object.keys(creds).map((k) => `${k}=${maskSecret(creds[k]!)}`).join(', ')}. Next: clai pull ${c.id}`));
         } else if (!ctx.json) console.log(ok(`${c.displayName} configured (not verified)`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 
   program
     .command('disconnect <source>')
     .description('Remove stored credentials for a connector (keeps ingested data)')
-    .action((source: string, _o: unknown, cmd: Command) => {
+    .action(async (source: string, _o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
         const removed = deleteCredentials(source, ctx.env);
         if (ctx.json) return printJson({ removed });
         console.log(removed ? ok(`Removed credentials for ${source}`) : warn(`No stored credentials for ${source}`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 
@@ -96,10 +96,10 @@ export function registerConnect(program: Command): void {
         if (ctx.json) return printJson({ results });
         console.log(heading('clai pull'));
         console.log(table(['source', 'seen', 'new', 'updated', 'unpriced', 'time', 'status'], results.map((r) => [r.source, String(r.seen), String(r.inserted), String(r.updated), r.unpriced ? warn(String(r.unpriced)) : '0', `${(r.durationMs / 1000).toFixed(1)}s`, r.error ? fail(r.error) : ok('ok')])));
-        const t = ctx.store.total({ since: parseSince('30d') ?? undefined });
+        const t = await ctx.store.total({ since: parseSince('30d') ?? undefined });
         console.log(dim(`  Last 30 days across all sources: ${formatUsd(t.usd)}`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }

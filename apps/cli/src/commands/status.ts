@@ -15,7 +15,7 @@ export function registerStatus(program: Command): void {
           const { runLocalScan } = await import('@claii/server');
           await runLocalScan(ctx.runner);
         }
-        const s = computeSummary(ctx.store, ctx.catalog, { since: 'month' });
+        const s = await computeSummary(ctx.store, ctx.catalog, { since: 'month' });
         const top = s.byModel[0];
         const plan = s.subscriptions[0];
         const parts = [`today ${formatUsd(s.today.usd)}`, `month ${formatUsd(s.thisMonth.usd)} → ${formatUsd(s.forecast.projectedUsd)}`];
@@ -24,7 +24,7 @@ export function registerStatus(program: Command): void {
         if (ctx.json) return printJson({ today: s.today.usd, month: s.thisMonth.usd, projected: s.forecast.projectedUsd, topModel: top?.key ?? null, plan: plan ? { plan: plan.subscription.plan, multiple: plan.multiple } : null });
         process.stdout.write(parts.join(' | ') + '\n');
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }

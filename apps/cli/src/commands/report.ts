@@ -32,7 +32,7 @@ export function registerReport(program: Command): void {
     .option('--billing <mode>', 'api | subscription | unknown')
     .option('--model <key>', 'filter by model')
     .option('--limit <n>', 'rows to show', '15')
-    .action((view: string | undefined, opts: ReportOpts, cmd: Command) => {
+    .action(async (view: string | undefined, opts: ReportOpts, cmd: Command) => {
       const g = cmd.optsWithGlobals() as GlobalOptions;
       const v = (view ?? 'overview') as View;
       if (!VIEWS.includes(v)) throw new Error(`Unknown view "${view}". Use one of: ${VIEWS.join(', ')}`);
@@ -40,19 +40,19 @@ export function registerReport(program: Command): void {
       try {
         const q: QueryOptions = { since: opts.since, until: opts.until, provider: opts.provider, source: opts.source, project: opts.project, actor: opts.actor, billing: opts.billing, model: opts.model };
         const limit = Number(opts.limit) || 15;
-        if (v === 'overview') return overview(ctx, q);
-        if (v === 'sessions') return sessions(ctx, q, limit);
-        if (v === 'weekly') return weekly(ctx, q);
+        if (v === 'overview') return await overview(ctx, q);
+        if (v === 'sessions') return await sessions(ctx, q, limit);
+        if (v === 'weekly') return await weekly(ctx, q);
         const dim = v === 'daily' ? 'day' : v === 'monthly' ? 'month' : v === 'models' ? 'model' : v === 'projects' ? 'project' : v === 'providers' ? 'provider' : v === 'sources' ? 'source' : v === 'people' ? 'actor' : v === 'surfaces' ? 'surface' : 'billing';
-        return dimension(ctx, dim, q, v === 'daily' || v === 'monthly' ? 400 : limit, v);
+        return await dimension(ctx, dim, q, v === 'daily' || v === 'monthly' ? 400 : limit, v);
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }
 
-function overview(ctx: ReturnType<typeof openContext>, q: QueryOptions): void {
-  const s = computeSummary(ctx.store, ctx.catalog, q);
+async function overview(ctx: ReturnType<typeof openContext>, q: QueryOptions): Promise<void> {
+  const s = await computeSummary(ctx.store, ctx.catalog, q);
   if (ctx.json) return printJson(s);
   const u = s.totals.usage;
   console.log(heading(`clai report`) + dim(`  ${q.since ?? '30d'}${q.until ? ` to ${q.until}` : ''} · ${s.range.timeZone}`));
@@ -93,8 +93,8 @@ function overview(ctx: ReturnType<typeof openContext>, q: QueryOptions): void {
   console.log(dim('  Views: clai report daily | weekly | monthly | models | projects | sessions | people'));
 }
 
-function dimension(ctx: ReturnType<typeof openContext>, dim: string, q: QueryOptions, limit: number, view: string): void {
-  const rows = breakdown(ctx.store, dim, q, limit);
+async function dimension(ctx: ReturnType<typeof openContext>, dim: string, q: QueryOptions, limit: number, view: string): Promise<void> {
+  const rows = await breakdown(ctx.store, dim, q, limit);
   if (ctx.json) return printJson({ dim, rows });
   console.log(heading(`clai report ${view}`) + ` ${dimRange(q)}`);
   if (rows.length === 0) return console.log(dimText('  no data in range'));
@@ -109,8 +109,8 @@ function dimension(ctx: ReturnType<typeof openContext>, dim: string, q: QueryOpt
   console.log(dimText(`  total ${formatUsd(total)} across ${rows.length} ${dim}${rows.length === 1 ? '' : 's'}`));
 }
 
-function weekly(ctx: ReturnType<typeof openContext>, q: QueryOptions): void {
-  const days = breakdown(ctx.store, 'day', q, 1000);
+async function weekly(ctx: ReturnType<typeof openContext>, q: QueryOptions): Promise<void> {
+  const days = await breakdown(ctx.store, 'day', q, 1000);
   const weeks = new Map<string, { usd: number; requests: number; events: number }>();
   for (const d of days) {
     const wd = weekdayIndex(`${d.key}T12:00:00Z`, 'UTC');
@@ -128,9 +128,9 @@ function weekly(ctx: ReturnType<typeof openContext>, q: QueryOptions): void {
   console.log(table(['week of', 'spend', 'requests', ''], rows.map(([week, w]) => [week, formatUsd(w.usd), String(w.requests || w.events), bar(w.usd / max, 20)]), ['l', 'r', 'r', 'l']));
 }
 
-function sessions(ctx: ReturnType<typeof openContext>, q: QueryOptions, limit: number): void {
+async function sessions(ctx: ReturnType<typeof openContext>, q: QueryOptions, limit: number): Promise<void> {
   const filter = toFilter(q, ctx.store.timeZone);
-  const rows = ctx.store.sessions(filter, limit);
+  const rows = await ctx.store.sessions(filter, limit);
   if (ctx.json) return printJson({ sessions: rows });
   console.log(heading('clai report sessions') + ` ${dimRange(q)}`);
   if (rows.length === 0) return console.log(dimText('  no sessions in range'));

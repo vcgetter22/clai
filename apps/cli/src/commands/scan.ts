@@ -35,16 +35,16 @@ export function registerScan(program: Command): void {
         const known = localConnectors.map((c) => c.id);
         const skipped = known.filter((id) => !results.some((r) => r.source === id));
         if (skipped.length) console.log(dim(`  skipped: ${skipped.join(', ')}`));
-        const s = computeSummary(ctx.store, ctx.catalog, { since: '30d' });
+        const s = await computeSummary(ctx.store, ctx.catalog, { since: '30d' });
         console.log('');
-        console.log(ok(`${ctx.store.countEvents()} events in ${ctx.store.path}`));
+        console.log(ok(`${await ctx.store.countEvents()} events in ${ctx.store.path}`));
         console.log(`  Last 30 days: ${formatUsd(s.totals.usd)} across ${s.totals.events} requests. This month: ${formatUsd(s.thisMonth.usd)}, projected ${formatUsd(s.forecast.projectedUsd)}.`);
-        if (ctx.store.listSubscriptions().length === 0) {
+        if ((await ctx.store.listSubscriptions()).length === 0) {
           console.log(dim('  Tip: declare your plan so clai can value it, e.g. `clai plan set anthropic max_20x`'));
         }
         console.log(dim('  Next: `clai report`, `clai insights`, or `clai dashboard`'));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }

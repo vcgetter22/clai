@@ -16,10 +16,10 @@ export function registerSettings(program: Command): void {
     .command('list')
     .description('Show declared plans and the known plan catalog')
     .option('--catalog', 'list all known plans', false)
-    .action((opts: { catalog: boolean }, cmd: Command) => {
+    .action(async (opts: { catalog: boolean }, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
-        const subs = ctx.store.listSubscriptions();
+        const subs = await ctx.store.listSubscriptions();
         if (ctx.json) return printJson({ subscriptions: subs, catalog: opts.catalog ? ctx.catalog.subscriptions : undefined });
         console.log(heading('Declared plans'));
         if (subs.length === 0) console.log(dim('  none. Example: clai plan set anthropic max_20x'));
@@ -30,7 +30,7 @@ export function registerSettings(program: Command): void {
           console.log(table(['provider', 'plan', 'display', 'price/mo', 'seat-based', 'verified'], ctx.catalog.subscriptions.map((p) => [p.provider, p.plan, p.display, p.priceMonthly === null ? 'custom' : formatUsd(p.priceMonthly), p.seatBased ? 'yes' : 'no', p.verified ? 'yes' : 'no'])));
         }
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   plan
@@ -41,7 +41,7 @@ export function registerSettings(program: Command): void {
     .option('--label <text>', 'display label')
     .option('--sources <ids>', 'comma-separated sources this plan covers (default: all non-API usage of the provider)')
     .option('--id <id>', 'custom id (default provider-plan)')
-    .action((provider: string, planKey: string, opts: { price?: string; seats: string; label?: string; sources?: string; id?: string }, cmd: Command) => {
+    .action(async (provider: string, planKey: string, opts: { price?: string; seats: string; label?: string; sources?: string; id?: string }, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
         const p = providerOf(provider);
@@ -61,25 +61,25 @@ export function registerSettings(program: Command): void {
           seats: Number(opts.seats) || 1,
           appliesTo: opts.sources ? { sources: opts.sources.split(',').map((s) => s.trim()) as SourceId[] } : undefined,
         };
-        ctx.store.putSubscription(sub);
+        await ctx.store.putSubscription(sub);
         if (ctx.json) return printJson({ subscription: sub });
         console.log(ok(`Declared ${sub.label ?? sub.plan} at ${formatUsd(price)}/mo${sub.seats && sub.seats > 1 ? ` x ${sub.seats} seats` : ''} (id ${sub.id})`));
         console.log(dim('  Local usage of this provider will be attributed to the plan. Run `clai scan --full` to relabel already-ingested usage.'));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   plan
     .command('remove <id>')
     .description('Remove a declared plan')
-    .action((id: string, _o: unknown, cmd: Command) => {
+    .action(async (id: string, _o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
-        const removed = ctx.store.deleteSubscription(id);
+        const removed = await ctx.store.deleteSubscription(id);
         if (ctx.json) return printJson({ removed });
         console.log(removed ? ok(`Removed ${id}`) : warn(`No plan with id ${id}`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 
@@ -87,16 +87,16 @@ export function registerSettings(program: Command): void {
   const budget = program.command('budget').description('Monthly budgets with projections and breach warnings');
   budget
     .command('list')
-    .action((_o: unknown, cmd: Command) => {
+    .action(async (_o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
-        const budgets = ctx.store.listBudgets();
+        const budgets = await ctx.store.listBudgets();
         if (ctx.json) return printJson({ budgets });
         console.log(heading('Budgets'));
         if (budgets.length === 0) return console.log(dim('  none. Example: clai budget set "AI tools" 300'));
         console.log(table(['id', 'name', 'amount/mo', 'scope'], budgets.map((b) => [b.id, b.name, formatUsd(b.amountUsd), b.scope ? JSON.stringify(b.scope) : 'all'])));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   budget
@@ -107,7 +107,7 @@ export function registerSettings(program: Command): void {
     .option('--project <name>')
     .option('--actor <key>')
     .option('--id <id>')
-    .action((name: string, amount: string, opts: { provider?: string; source?: string; project?: string; actor?: string; id?: string }, cmd: Command) => {
+    .action(async (name: string, amount: string, opts: { provider?: string; source?: string; project?: string; actor?: string; id?: string }, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
         const amountUsd = Number(amount);
@@ -118,23 +118,23 @@ export function registerSettings(program: Command): void {
         if (opts.project) scope.project = opts.project;
         if (opts.actor) scope.actorKey = opts.actor;
         const b: Budget = { id: opts.id ?? name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name, amountUsd, period: 'month', scope: Object.keys(scope).length ? scope : undefined };
-        ctx.store.putBudget(b);
+        await ctx.store.putBudget(b);
         if (ctx.json) return printJson({ budget: b });
         console.log(ok(`Budget "${name}" set to ${formatUsd(amountUsd)}/month${b.scope ? ` for ${JSON.stringify(b.scope)}` : ''}`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   budget
     .command('remove <id>')
-    .action((id: string, _o: unknown, cmd: Command) => {
+    .action(async (id: string, _o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
-        const removed = ctx.store.deleteBudget(id);
+        const removed = await ctx.store.deleteBudget(id);
         if (ctx.json) return printJson({ removed });
         console.log(removed ? ok(`Removed ${id}`) : warn(`No budget with id ${id}`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 
@@ -142,46 +142,46 @@ export function registerSettings(program: Command): void {
   const seat = program.command('seat').description('Paid seats per person (team mode) for idle-seat detection');
   seat
     .command('list')
-    .action((_o: unknown, cmd: Command) => {
+    .action(async (_o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
-        const seats = ctx.store.listSeats();
+        const seats = await ctx.store.listSeats();
         if (ctx.json) return printJson({ seats });
         console.log(heading('Seats'));
         if (seats.length === 0) return console.log(dim('  none. Example: clai seat add jane@acme.com anthropic team_premium'));
         console.log(table(['actor', 'provider', 'plan', 'price/mo', 'label'], seats.map((s) => [s.actorKey, s.provider, s.plan, formatUsd(s.priceMonthly), s.label ?? ''])));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   seat
     .command('add <actorKey> <provider> <plan>')
     .option('--price <usd>')
     .option('--label <text>')
-    .action((actorKey: string, provider: string, planKey: string, opts: { price?: string; label?: string }, cmd: Command) => {
+    .action(async (actorKey: string, provider: string, planKey: string, opts: { price?: string; label?: string }, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
         const p = providerOf(provider);
         const known = ctx.catalog.subscriptions.find((s) => s.provider === p && s.plan === planKey);
         const price = opts.price !== undefined ? Number(opts.price) : (known?.priceMonthly ?? 0);
         const s: Seat = { actorKey, provider: p, plan: planKey, priceMonthly: price, label: opts.label };
-        ctx.store.putSeat(s);
+        await ctx.store.putSeat(s);
         if (ctx.json) return printJson({ seat: s });
         console.log(ok(`Seat ${actorKey}: ${known?.display ?? planKey} at ${formatUsd(price)}/mo`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   seat
     .command('remove <actorKey>')
-    .action((actorKey: string, _o: unknown, cmd: Command) => {
+    .action(async (actorKey: string, _o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
-        const removed = ctx.store.deleteSeat(actorKey);
+        const removed = await ctx.store.deleteSeat(actorKey);
         if (ctx.json) return printJson({ removed });
         console.log(removed ? ok(`Removed seat ${actorKey}`) : warn(`No seat for ${actorKey}`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 
@@ -189,21 +189,21 @@ export function registerSettings(program: Command): void {
   const config = program.command('config').description('Settings: timezone, identity (email/name/device used when syncing to a team)');
   config
     .command('list')
-    .action((_o: unknown, cmd: Command) => {
+    .action(async (_o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
-        const all = ctx.store.allSettings();
+        const all = await ctx.store.allSettings();
         if (ctx.json) return printJson(all);
         console.log(heading('Settings') + dim(`  ${ctx.store.path}`));
         console.log(table(['key', 'value'], Object.entries(all)));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
   config
     .command('set <key> <value>')
     .description('Keys: timezone, identity.email, identity.name, identity.device, sync.server')
-    .action((key: string, value: string, _o: unknown, cmd: Command) => {
+    .action(async (key: string, value: string, _o: unknown, cmd: Command) => {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
         if (key === 'timezone') {
@@ -212,15 +212,15 @@ export function registerSettings(program: Command): void {
           } catch {
             throw new Error(`Invalid IANA timezone "${value}"`);
           }
-          ctx.store.recomputeDays(value);
+          await ctx.store.recomputeDays(value);
           if (ctx.json) return printJson({ key, value });
           return console.log(ok(`Timezone set to ${value}; day totals recomputed.`));
         }
-        ctx.store.setSetting(key, value);
+        await ctx.store.setSetting(key, value);
         if (ctx.json) return printJson({ key, value });
         console.log(ok(`${key} = ${value}`));
       } finally {
-        ctx.close();
+        await ctx.close();
       }
     });
 }
