@@ -139,9 +139,12 @@ export interface HealthResponse {
   version: string;
   mode: 'local' | 'team';
   timeZone: string;
-  db: { events: number; first: string | null; last: string | null };
+  /** Omitted by the team server: `/api/health` is public there and reveals no database stats without auth. */
+  db?: { events: number; first: string | null; last: string | null };
   pricingVersion: string;
   authRequired: boolean;
+  /** Hosted extensions (mock only via `?hosted=1`; see docs/dashboard-api.md). */
+  auth?: { kind: 'token' | 'supabase' };
 }
 
 export interface SummaryResponse {
@@ -240,6 +243,15 @@ export interface WhoamiResponse {
   actorKey: string;
   role: 'admin' | 'member';
   label?: string;
+  // Hosted extensions (mock only via `?hosted=1`; see docs/dashboard-api.md).
+  email?: string | null;
+  orgId?: string | null;
+  orgs?: { id: string; name: string }[];
+  plan?: 'free' | 'plus' | 'team' | 'business';
+  billingStatus?: 'active' | 'past_due' | 'canceled' | null;
+  upgradeUrl?: string | null;
+  portalUrl?: string | null;
+  tosAccepted?: boolean;
 }
 
 export interface ScanResult {

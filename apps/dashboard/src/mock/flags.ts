@@ -6,6 +6,10 @@
  *   ?team=1        (mock only) simulate team mode: multi-actor data, seats, and
  *                  the same bearer-token gate the real team server enforces
  *   ?empty=1       (mock only) simulate a freshly-installed clai with zero events
+ *   ?hosted=1      (mock only) add the additive hosted-service fields documented in
+ *                  docs/dashboard-api.md's "Hosted extensions" appendix (health.auth,
+ *                  whoami.email/orgId/orgs/plan/billingStatus/upgradeUrl/portalUrl/tosAccepted).
+ *                  None of this is served by the real API yet; combinable with ?team=1.
  */
 
 function params(): URLSearchParams {
@@ -22,4 +26,8 @@ export function isMockTeam(): boolean {
 
 export function isMockEmpty(): boolean {
   return isMock() && params().get('empty') === '1';
+}
+
+export function isMockHosted(): boolean {
+  return isMock() && params().get('hosted') === '1';
 }

@@ -40,6 +40,9 @@ type UsageEvent = { id: string; ts: string; source: string; provider: string; mo
 ```json
 { "ok": true, "version": "0.1.0", "mode": "local" | "team", "timeZone": "Europe/Berlin", "db": { "events": 12345, "first": "2026-06-01T..", "last": "2026-09-03T.." }, "pricingVersion": "2026-09-03", "authRequired": false }
 ```
+In team mode this endpoint is public (no bearer token) and the response has no `db` field, so an
+unauthenticated caller cannot learn how much data the server holds; `db` is present only in local
+mode, where there is no auth to bypass.
 
 ### `GET /api/summary` (common params)
 ```json
@@ -91,10 +94,36 @@ Catalog joined with usage in range; models without usage are included with zeros
 - `POST /api/scan` (local mode only) -> `{ "results": [{ "source": "claude-code", "seen": 10, "inserted": 3, "updated": 0, "unpriced": 0, "error": null }] }`
 
 ### Team mode
-- Every request needs `Authorization: Bearer <token>`; `401` => the SPA shows a token prompt and stores the token in `localStorage['clai_token']`.
+- Every request except `GET /api/health` needs `Authorization: Bearer <token>`; `401` => the SPA shows a token prompt and stores the token in `localStorage['clai_token']`.
 - `GET /api/whoami` -> `{ "actorKey": "a@b.c", "role": "admin" | "member", "label": "..." }`
 - Members see only their own data unless role is `admin`.
 - `POST /api/v1/ingest` body `{ "events": UsageEvent[] }` (used by `clai sync`, not by the SPA).
+- Admin-only: `GET/POST /api/admin/tokens` (`POST` body `{ "actorKey", "role"?, "label"?, "expiresAt"? }` -> `{ "token", "actorKey", "role" }`, the token is shown once), `DELETE /api/admin/tokens/:hash`, `GET/POST /api/admin/members`. `403` for a non-admin.
 
 ## Errors
 `{ "error": "message" }` with 4xx/5xx status.
+
+## Hosted extensions
+
+The hosted service (`clai-cloud`, a separate private repo) serves the same contract above plus a
+small number of additive fields — existing fields never change meaning or shape, so a client built
+against this document keeps working unmodified against the hosted API. None of this is served by
+`clai` or `clai-server` today; the mock engine (`apps/dashboard/src/mock`) renders it behind
+`?mock=1&hosted=1` (combinable with `?team=1`) so the dashboard can be built and screenshotted
+against it ahead of the hosted API existing.
+
+- `GET /api/health` gains `auth: { kind: 'token' | 'supabase' }`, naming which credential scheme
+  the server accepts (self-hosted team servers only ever accept `clai_*` bearer tokens, so `kind`
+  is `'token'` there; the hosted service also accepts a Supabase-issued JWT).
+- `GET /api/whoami` gains, all optional: `email`, `orgId`, `orgs: { id, name }[]`, `plan: 'free' |
+  'plus' | 'team' | 'business'`, `billingStatus: 'active' | 'past_due' | 'canceled' | null`,
+  `upgradeUrl: string | null` (a Stripe Payment Link when the org isn't on a paid plan),
+  `portalUrl: string | null` (the Stripe Billing Portal once subscribed), `tosAccepted: boolean`.
+- `POST /v1/ingest`'s response gains `dropped: number` (events rejected for being older than the
+  org's retention window; always `0` from a self-hosted server, which has no retention window).
+- New routes, not present on `clai-server`: `/api/auth/*` (Supabase Auth magic-link proxy and the
+  CLI device-code flow) and `/api/me/tokens` (self-service `clai_*` token management).
+
+Team mode's `GET /api/health` is public (no bearer token required) precisely so a load balancer
+or the hosted dashboard's pre-login screen can call it; it never includes `db` (that would leak an
+event count to an unauthenticated caller). `db` is present only in local mode.

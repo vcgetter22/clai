@@ -133,7 +133,9 @@ export default function App() {
     return <div className="loading-note" style={{ padding: 24 }}>Loading clai…</div>;
   }
 
-  const emptyDb = health.db.events === 0;
+  // Team mode's /api/health is public and carries no db stats (no auth => no counts leaked);
+  // without them we can't tell an empty server from a full one, so don't claim it's empty.
+  const emptyDb = health.db ? health.db.events === 0 : false;
 
   return (
     <div className="shell">

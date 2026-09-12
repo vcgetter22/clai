@@ -18,7 +18,7 @@ import type {
 import { formatPct, formatTokens, formatUsd } from '../format';
 import { ACTIVE_MODEL_KEYS, MODEL_CATALOG, PLAN_CATALOG, ACTOR_POOL, findModel } from './catalog';
 import { getDataset, type MockDataset } from './generate';
-import { isMockEmpty, isMockTeam } from './flags';
+import { isMockEmpty, isMockHosted, isMockTeam } from './flags';
 
 // ------------------------------------------------------------------ dataset
 
@@ -357,10 +357,26 @@ export function health(): HealthResponse {
     db: { events: ds.events.length, first, last },
     pricingVersion: '2026-09-03',
     authRequired: isMockTeam(),
+    ...(isMockHosted() ? { auth: { kind: 'supabase' as const } } : {}),
   };
 }
 
 export function whoami(): WhoamiResponse {
+  if (isMockHosted()) {
+    return {
+      actorKey: 'aria@clai.dev',
+      role: 'admin',
+      label: 'Aria Chen',
+      email: 'aria@clai.dev',
+      orgId: 'org_mock',
+      orgs: [{ id: 'org_mock', name: "Aria's org" }],
+      plan: 'free',
+      billingStatus: null,
+      upgradeUrl: 'https://buy.stripe.com/mock-plus-monthly',
+      portalUrl: null,
+      tosAccepted: true,
+    };
+  }
   if (isMockTeam()) return { actorKey: 'aria@clai.dev', role: 'admin', label: 'Aria Chen' };
   return { actorKey: 'me', role: 'admin', label: 'local' };
 }
