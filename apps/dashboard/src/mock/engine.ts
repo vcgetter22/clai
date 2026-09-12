@@ -351,7 +351,7 @@ export function health(): HealthResponse {
   const last = ds.events[ds.events.length - 1]?.ts ?? null;
   return {
     ok: true,
-    version: '0.1.0-mock',
+    version: '0.2.0-mock',
     mode: isMockTeam() ? 'team' : 'local',
     timeZone: 'UTC',
     db: { events: ds.events.length, first, last },

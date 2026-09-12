@@ -1,6 +1,6 @@
 {
   "name": "@claii/connectors",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "clai connectors: local agent logs (Claude Code, Codex, Gemini CLI, OpenCode, Cline, Aider), provider admin APIs (Anthropic, OpenAI, OpenRouter, Cursor, GitHub Copilot) and data exports.",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,7 +18,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@claii/core": "0.1.0",
+    "@claii/core": "0.2.0",
     "gpt-tokenizer": "^4.0.0"
   },
   "license": "MIT",

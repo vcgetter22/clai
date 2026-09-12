@@ -1,6 +1,6 @@
 {
   "name": "@claii/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "clai: see what your AI really costs. Tracks Claude, ChatGPT/Codex, Gemini, Cursor, Copilot and API usage with real prices, locally.",
   "type": "module",
   "bin": {
@@ -16,10 +16,10 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
-    "@claii/connectors": "0.1.0",
-    "@claii/core": "0.1.0",
-    "@claii/dashboard": "0.1.0",
-    "@claii/store": "0.1.0",
+    "@claii/connectors": "0.2.0",
+    "@claii/core": "0.2.0",
+    "@claii/dashboard": "0.2.0",
+    "@claii/store": "0.2.0",
     "commander": "^14.0.0",
     "picocolors": "^1.1.1"
   },

@@ -11,7 +11,7 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> 
   const { catalog, overridden } = loadCatalog(env);
   const boot = await bootstrapTeam(store, env);
   const log = { debug: () => {}, info: (m: string) => console.log(`[clai-server] ${m}`), warn: (m: string) => console.warn(`[clai-server] ${m}`) };
-  const { url } = await listen({ store, catalog, mode: 'team', version: '0.1.0', port, host: env['HOST'] ?? '0.0.0.0', runner: { log, env } });
+  const { url } = await listen({ store, catalog, mode: 'team', version: '0.2.0', port, host: env['HOST'] ?? '0.0.0.0', runner: { log, env } });
   log.info(`team server listening on ${url} (db: ${dbPath}${overridden ? ', pricing overrides active' : ''})`);
   if (boot.adminTokenCreated) {
     log.info('');
