@@ -75,14 +75,14 @@ export function toFilter(q: QueryOptions, timeZone: string): EventFilter {
   return f;
 }
 
-export function insightContext(store: EventStore, catalog: PricingCatalog, now = new Date()): InsightContext {
+export async function insightContext(store: EventStore, catalog: PricingCatalog, now = new Date()): Promise<InsightContext> {
   return {
     now,
     timeZone: store.timeZone,
     catalog,
-    subscriptions: store.listSubscriptions(),
-    budgets: store.listBudgets(),
-    seats: store.listSeats(),
+    subscriptions: await store.listSubscriptions(),
+    budgets: await store.listBudgets(),
+    seats: await store.listSeats(),
   };
 }
 
@@ -92,7 +92,7 @@ function withShare(rows: { key: string; usd: number; computedUsd: number; billed
 }
 
 /** Everything the overview needs, computed with the same filters the CLI uses. */
-export function computeSummary(store: EventStore, catalog: PricingCatalog, q: QueryOptions = {}): Summary {
+export async function computeSummary(store: EventStore, catalog: PricingCatalog, q: QueryOptions = {}): Promise<Summary> {
   const now = q.now ?? new Date();
   const tz = store.timeZone;
   const filter = toFilter(q, tz);
@@ -106,14 +106,14 @@ export function computeSummary(store: EventStore, catalog: PricingCatalog, q: Qu
   delete scope.since;
   delete scope.until;
 
-  const totals = store.total(filter);
-  const todayT = store.total({ ...scope, fromDay: today, toDay: today });
-  const monthT = store.total({ ...scope, fromDay: `${month}-01`, toDay: `${month}-${String(daysInMonth(month)).padStart(2, '0')}` });
-  const lastT = store.total({ ...scope, fromDay: `${lastMonthKey}-01`, toDay: `${lastMonthKey}-${String(daysInMonth(lastMonthKey)).padStart(2, '0')}` });
+  const totals = await store.total(filter);
+  const todayT = await store.total({ ...scope, fromDay: today, toDay: today });
+  const monthT = await store.total({ ...scope, fromDay: `${month}-01`, toDay: `${month}-${String(daysInMonth(month)).padStart(2, '0')}` });
+  const lastT = await store.total({ ...scope, fromDay: `${lastMonthKey}-01`, toDay: `${lastMonthKey}-${String(daysInMonth(lastMonthKey)).padStart(2, '0')}` });
 
   // Forecast and plan/budget math need ~90 days of history regardless of the display range.
-  const histRows = store.rows({ ...scope, fromDay: addDays(today, -95) }, { bySession: false });
-  const ctx = insightContext(store, catalog, now);
+  const histRows = await store.rows({ ...scope, fromDay: addDays(today, -95) }, { bySession: false });
+  const ctx = await insightContext(store, catalog, now);
   const fc = forecast(histRows, ctx);
 
   const subs = subscriptionValueInsights(histRows, ctx).map((i) => ({
@@ -132,7 +132,7 @@ export function computeSummary(store: EventStore, catalog: PricingCatalog, q: Qu
   }));
 
   // Daily series filled for the whole range.
-  const rangeRows = store.rows(filter, { bySession: false });
+  const rangeRows = await store.rows(filter, { bySession: false });
   const byDay = new Map<string, { usd: number; events: number; byProvider: Record<string, number> }>();
   for (const r of rangeRows) {
     const d = byDay.get(r.day) ?? { usd: 0, events: 0, byProvider: {} };
@@ -160,31 +160,31 @@ export function computeSummary(store: EventStore, catalog: PricingCatalog, q: Qu
     thisMonth: { usd: round4(monthT.usd), events: monthT.events },
     lastMonth: { usd: round4(lastT.usd), events: lastT.events },
     forecast: fc,
-    byProvider: withShare(store.totalsBy('provider', filter)),
-    byModel: withShare(store.totalsBy('model', filter, 100)),
-    bySource: withShare(store.totalsBy('source', filter)),
-    byProject: withShare(store.totalsBy('project', filter, 100)),
-    bySurface: withShare(store.totalsBy('surface', filter)),
-    byBilling: withShare(store.totalsBy('billing', filter)),
+    byProvider: withShare(await store.totalsBy('provider', filter)),
+    byModel: withShare(await store.totalsBy('model', filter, 100)),
+    bySource: withShare(await store.totalsBy('source', filter)),
+    byProject: withShare(await store.totalsBy('project', filter, 100)),
+    bySurface: withShare(await store.totalsBy('surface', filter)),
+    byBilling: withShare(await store.totalsBy('billing', filter)),
     daily,
     subscriptions: subs,
     budgets,
   };
 }
 
-export function computeInsights(store: EventStore, catalog: PricingCatalog, q: QueryOptions = {}): Insight[] {
+export async function computeInsights(store: EventStore, catalog: PricingCatalog, q: QueryOptions = {}): Promise<Insight[]> {
   const now = q.now ?? new Date();
   const filter = toFilter({ ...q, since: q.since ?? '90d' }, store.timeZone);
-  const rows = store.rows(filter);
-  return generateInsights(rows, insightContext(store, catalog, now));
+  const rows = await store.rows(filter);
+  return generateInsights(rows, await insightContext(store, catalog, now));
 }
 
-export function breakdown(store: EventStore, dim: string, q: QueryOptions, limit = 50): Breakdown[] {
+export async function breakdown(store: EventStore, dim: string, q: QueryOptions, limit = 50): Promise<Breakdown[]> {
   const filter = toFilter(q, store.timeZone);
   const col = dim === 'actor' ? 'actor_key' : dim;
   const allowed = ['day', 'month', 'provider', 'model', 'source', 'project', 'actor_key', 'surface', 'billing', 'plan', 'session_id'];
   if (!allowed.includes(col)) throw new Error(`Unknown dimension "${dim}". Use one of: ${allowed.map((a) => (a === 'actor_key' ? 'actor' : a)).join(', ')}`);
-  return withShare(store.totalsBy(col as Parameters<EventStore['totalsBy']>[0], filter, limit));
+  return withShare(await store.totalsBy(col as Parameters<EventStore['totalsBy']>[0], filter, limit));
 }
 
 function round2(n: number): number {

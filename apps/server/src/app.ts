@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { serve, type ServerType } from '@hono/node-server';
 import type { PricingCatalog } from '@claii/core';
 import type { EventStore } from '@claii/store';
-import { createApi, createToken, tokenHash } from './api.js';
+import { createApi, mintToken, tokenHash, type ApiOptions } from './api.js';
 import { runAllApiPulls, runLocalScan, type RunResult, type RunnerOptions } from './runner.js';
 import { dashboardDistDir, serveDashboard } from './static.js';
 
@@ -15,6 +15,9 @@ export interface AppOptions {
   /** Local mode: enable POST /api/scan. */
   allowScan?: boolean;
   dashboardDir?: string | null;
+  publicPaths?: ApiOptions['publicPaths'];
+  resolvePrincipal?: ApiOptions['resolvePrincipal'];
+  storeFor?: ApiOptions['storeFor'];
 }
 
 export function createApp(opts: AppOptions): Hono {
@@ -26,6 +29,9 @@ export function createApp(opts: AppOptions): Hono {
     mode: opts.mode,
     version: opts.version,
     scan: opts.mode === 'local' && opts.allowScan !== false ? () => runLocalScan(runnerOpts) : undefined,
+    publicPaths: opts.publicPaths,
+    resolvePrincipal: opts.resolvePrincipal,
+    storeFor: opts.storeFor,
   });
   app.route('/api', api);
   app.get('*', serveDashboard(opts.dashboardDir === undefined ? dashboardDistDir() : opts.dashboardDir));
@@ -50,18 +56,17 @@ export function listen(opts: ListenOptions): Promise<{ server: ServerType; url: 
 }
 
 /** Team server bootstrap: ensure an admin token exists (from CLAI_ADMIN_TOKEN or a freshly generated one) and schedule connector pulls. */
-export function bootstrapTeam(store: EventStore, env: NodeJS.ProcessEnv = process.env): { adminTokenCreated: string | null } {
-  const count = Number((store.db.prepare('SELECT COUNT(*) AS n FROM api_tokens WHERE revoked_at IS NULL').get() as { n: number }).n);
+export async function bootstrapTeam(store: EventStore, env: NodeJS.ProcessEnv = process.env): Promise<{ adminTokenCreated: string | null }> {
+  const count = await store.countActiveTokens();
   if (count > 0) return { adminTokenCreated: null };
+  const actorKey = env['CLAI_ADMIN_EMAIL'] ?? 'admin';
   const provided = env['CLAI_ADMIN_TOKEN'];
-  if (provided) {
-    // Register the provided token verbatim for a reproducible bootstrap (docker/compose setups).
-    store.db
-      .prepare('INSERT INTO api_tokens(token_hash, actor_key, label, role, created_at) VALUES (:h, :a, :l, :r, :now)')
-      .run({ h: tokenHash(provided), a: env['CLAI_ADMIN_EMAIL'] ?? 'admin', l: 'bootstrap admin', r: 'admin', now: new Date().toISOString() });
-    return { adminTokenCreated: provided };
-  }
-  return { adminTokenCreated: createToken(store, env['CLAI_ADMIN_EMAIL'] ?? 'admin', 'admin', 'bootstrap admin') };
+  // Register a provided token verbatim for a reproducible bootstrap (docker/compose setups),
+  // otherwise mint a fresh one; either way insertToken + upsertMember is what mintToken's caller does.
+  const { token, tokenHash: hash } = provided ? { token: provided, tokenHash: tokenHash(provided) } : mintToken('admin');
+  await store.insertToken({ tokenHash: hash, actorKey, role: 'admin', label: 'bootstrap admin' });
+  await store.upsertMember({ actorKey, displayName: 'bootstrap admin', role: 'admin' });
+  return { adminTokenCreated: token };
 }
 
 export function schedulePulls(runner: RunnerOptions, intervalMinutes: number, onResult?: (r: RunResult[]) => void): () => void {
