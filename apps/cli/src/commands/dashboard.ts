@@ -1,20 +1,8 @@
-import { spawn } from 'node:child_process';
 import type { Command } from 'commander';
 import { dashboardDistDir, listen, runLocalScan } from '@claii/server';
+import { openBrowser } from '../browser.js';
 import { openContext, type GlobalOptions } from '../context.js';
 import { dim, heading, ok, warn } from '../ui.js';
-
-function openBrowser(url: string): void {
-  const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
-  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
-  try {
-    const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
-    child.on('error', () => {});
-    child.unref();
-  } catch {
-    /* ignore */
-  }
-}
 
 export function registerDashboard(program: Command): void {
   program

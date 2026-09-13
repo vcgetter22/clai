@@ -8,6 +8,7 @@ import { registerDoctor } from './commands/doctor.js';
 import { registerExport } from './commands/export.js';
 import { registerImport } from './commands/import.js';
 import { registerInsights } from './commands/insights.js';
+import { registerLogin } from './commands/login.js';
 import { registerPricing } from './commands/pricing.js';
 import { registerReport } from './commands/report.js';
 import { registerScan } from './commands/scan.js';
@@ -46,6 +47,7 @@ export function buildProgram(): Command {
   registerSettings(program);
   registerConnect(program);
   registerImport(program);
+  registerLogin(program);
   registerSync(program);
   registerExport(program);
   registerPricing(program);

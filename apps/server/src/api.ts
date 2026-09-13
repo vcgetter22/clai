@@ -45,6 +45,27 @@ function newId(prefix: string): string {
   return `${prefix}_${randomBytes(6).toString('hex')}`;
 }
 
+function looksLikeEmail(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
+/**
+ * `:param`-aware match of a Hono route pattern (from `Hono#routes`, e.g. `/admin/tokens/:hash`)
+ * against a request path, anchored at the END: `c.req.path` inside a sub-app mounted with
+ * `app.route('/api', api)` is the *full* incoming path (`/api/admin/tokens/xyz`), not one trimmed
+ * to what `api` registered its routes under, so matching must tolerate an arbitrary mount prefix
+ * the same way `isPublic`'s `endsWith` check already does for the (param-free) public paths.
+ */
+function pathMatchesPattern(pattern: string, path: string): boolean {
+  const pat = pattern.split('/').filter(Boolean);
+  const seg = path.split('/').filter(Boolean);
+  const wildcard = pat[pat.length - 1] === '*';
+  const fixed = wildcard ? pat.slice(0, -1) : pat;
+  if (seg.length < fixed.length) return false;
+  const tail = seg.slice(seg.length - fixed.length);
+  return fixed.every((p, i) => p.startsWith(':') || p === tail[i]);
+}
+
 /** Hash used to store API tokens: never store the token itself. */
 export function tokenHash(token: string): string {
   return sha256(`clai-token:${token}`);
@@ -82,11 +103,22 @@ export function createApi(opts: ApiOptions): Hono<Env> {
 
   api.onError((err, c) => c.json({ error: err.message }, err.message.startsWith('Unknown dimension') ? 400 : 500));
 
+  // Registered lazily below (the middleware closure reads `api.routes` at request time, by which
+  // point every `.get`/`.post`/`.delete` call in this function has already run and populated it).
+  // `r.method === method` (never 'ALL') naturally excludes this very middleware's own `ALL /*` entry.
+  const hasRoute = (method: string, path: string): boolean => api.routes.some((r) => r.method === method && pathMatchesPattern(r.path, path));
+
   if (mode === 'team') {
     api.use('*', async (c, next) => {
       if (isPublic(c.req.path)) return next();
       const p = await resolvePrincipal(c);
-      if (!p) return c.json({ error: 'Unauthorized: provide a clai token as Authorization: Bearer <token>' }, 401);
+      if (!p) {
+        // A path nothing here serves (e.g. the hosted-only /auth/*) falls through to the normal
+        // 404 instead of leaking "this route exists but you're unauthorized" to an anonymous caller.
+        // `clai login`'s 404-vs-401 fallback detection against a self-hosted server relies on this.
+        if (!hasRoute(c.req.method, c.req.path)) return next();
+        return c.json({ error: 'Unauthorized: provide a clai token as Authorization: Bearer <token>' }, 401);
+      }
       c.set('principal', p);
       await next();
     });
@@ -95,14 +127,28 @@ export function createApi(opts: ApiOptions): Hono<Env> {
   api.get('/health', async (c) => {
     const store = await storeFor(c.get('principal'));
     const base = { ok: true, version: opts.version, mode, timeZone: store.timeZone, pricingVersion: catalog.version, authRequired: mode === 'team' };
-    if (mode === 'team') return c.json(base); // public in team mode: no database stats without auth
+    if (mode === 'team') return c.json({ ...base, auth: { kind: 'token' as const } }); // public in team mode: no database stats without auth
     const span = await store.span();
     return c.json({ ...base, db: { events: await store.countEvents(), first: span.first, last: span.last } });
   });
 
   api.get('/whoami', (c) => {
     const p = c.get('principal') ?? { actorKey: 'me', role: 'admin' as const, label: 'local' };
-    return c.json({ actorKey: p.actorKey, role: p.role, label: p.label ?? null });
+    return c.json({
+      actorKey: p.actorKey,
+      role: p.role,
+      label: p.label ?? null,
+      // Hosted extensions (docs/dashboard-api.md "Hosted extensions"): self-hosted values are the
+      // inert defaults: no org concept, no billing, ToS already satisfied by running your own server.
+      email: looksLikeEmail(p.actorKey) ? p.actorKey : null,
+      orgId: null,
+      orgs: [] as { id: string; name: string }[],
+      plan: 'self-hosted' as const,
+      billingStatus: null,
+      upgradeUrl: null,
+      portalUrl: null,
+      tosAccepted: true,
+    });
   });
 
   api.get('/summary', async (c) => {

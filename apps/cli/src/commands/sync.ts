@@ -2,6 +2,7 @@ import type { Command } from 'commander';
 import { parseSince, type UsageEvent } from '@claii/core';
 import { readCredentialsFile, writeCredentials } from '@claii/server';
 import { openContext, type GlobalOptions } from '../context.js';
+import { HOSTED_URL } from '../hosted.js';
 import { dim, fail, heading, ok, printJson } from '../ui.js';
 
 /** Remove local paths before sharing with a team; keeps the project label. */
@@ -24,8 +25,10 @@ export function registerSync(program: Command): void {
       const ctx = openContext(cmd.optsWithGlobals() as GlobalOptions);
       try {
         const saved = readCredentialsFile(ctx.env)['sync'] ?? {};
-        const server = (opts.server ?? ctx.env['CLAI_SYNC_SERVER'] ?? (await ctx.store.getSetting('sync.server')) ?? saved['server'])?.replace(/\/$/, '');
         const token = opts.token ?? ctx.env['CLAI_SYNC_TOKEN'] ?? saved['token'];
+        let server = (opts.server ?? ctx.env['CLAI_SYNC_SERVER'] ?? (await ctx.store.getSetting('sync.server')) ?? saved['server'])?.replace(/\/$/, '');
+        // A token with nothing else to resolve a server from (e.g. CLAI_SYNC_TOKEN alone) means the hosted service.
+        if (!server && token) server = HOSTED_URL;
         if (!server) throw new Error('No server. Pass --server https://clai.example.com or set CLAI_SYNC_SERVER.');
         if (!token) throw new Error('No token. Pass --token (ask your clai admin) or set CLAI_SYNC_TOKEN.');
         if (opts.server || opts.token) writeCredentials('sync', { server, token }, ctx.env);
@@ -39,6 +42,7 @@ export function registerSync(program: Command): void {
         let sent = 0;
         let inserted = 0;
         let updated = 0;
+        let dropped = 0;
         let maxTs = last ?? '';
         let chunk: UsageEvent[] = [];
         const sendChunk = async () => {
@@ -52,10 +56,11 @@ export function registerSync(program: Command): void {
             const body = await res.text().catch(() => '');
             throw new Error(`Server responded ${res.status}: ${body.slice(0, 300)}`);
           }
-          const r = (await res.json()) as { inserted: number; updated: number };
+          const r = (await res.json()) as { inserted: number; updated: number; dropped?: number };
           sent += chunk.length;
           inserted += r.inserted;
           updated += r.updated;
+          dropped += r.dropped ?? 0;
           for (const e of chunk) if (e.ts > maxTs) maxTs = e.ts;
           ctx.log.debug(`sent ${sent}`);
           chunk = [];
@@ -68,10 +73,11 @@ export function registerSync(program: Command): void {
         }
         await sendChunk();
         if (maxTs) await ctx.store.setSetting('sync.last_ts', maxTs);
-        if (ctx.json) return printJson({ server, sent, inserted, updated, since });
+        if (ctx.json) return printJson({ server, sent, inserted, updated, dropped, since });
         console.log(heading('clai sync'));
         console.log(ok(`sent ${sent} events to ${server} (${inserted} new, ${updated} updated on the server)`));
         if (!opts.keepPaths) console.log(dim('  Working directories and git remotes were stripped; project labels were kept.'));
+        if (dropped > 0) console.log(dim(`  ${dropped} events older than your plan's history window were not stored`));
       } catch (err) {
         if (ctx.json) {
           printJson({ error: (err as Error).message });
