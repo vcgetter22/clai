@@ -73,7 +73,7 @@ async function finalizeLogin(server: string, token: string, ctx: LoginContext): 
 
 async function pasteTokenFallback(server: string, ctx: LoginContext, deps: LoginDeps, out: (line: string) => void): Promise<LoginResult> {
   out(dim(`  No device login at ${server} (looks like a self-hosted clai-server). Falling back to a pasted token.`));
-  out(dim('  Ask your clai admin for a member token, or mint one with `clai admin token` / POST /api/admin/tokens.'));
+  out(dim('  Ask your clai admin for a member token (minted with POST /api/admin/tokens; see docs/team-server.md).'));
   const token = await deps.readToken('Paste your token: ');
   if (!token) return { ok: false, error: 'No token provided.' };
   await finalizeLogin(server, token, ctx);
