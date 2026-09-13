@@ -243,15 +243,37 @@ export interface WhoamiResponse {
   actorKey: string;
   role: 'admin' | 'member';
   label?: string;
-  // Hosted extensions (mock only via `?hosted=1`; see docs/dashboard-api.md).
+  // Hosted extensions (served for real by a self-hosted clai-server too, with inert defaults;
+  // mock via `?hosted=1`; see docs/dashboard-api.md "Hosted extensions").
   email?: string | null;
   orgId?: string | null;
   orgs?: { id: string; name: string }[];
-  plan?: 'free' | 'plus' | 'team' | 'business';
+  plan?: 'free' | 'plus' | 'team' | 'business' | 'self-hosted';
   billingStatus?: 'active' | 'past_due' | 'canceled' | null;
   upgradeUrl?: string | null;
   portalUrl?: string | null;
   tosAccepted?: boolean;
+}
+
+// ------------------------------------------------------- hosted auth (mock via `?mock=1&hosted=1`)
+
+export interface AuthLinkResponse {
+  sent: boolean;
+}
+
+export interface AuthVerifyResponse {
+  token: string;
+  refreshToken: string;
+}
+
+export interface DeviceApproveResponse {
+  approved: boolean;
+}
+
+export interface MachineTokenResponse {
+  token: string;
+  actorKey: string;
+  role: 'admin' | 'member';
 }
 
 export interface ScanResult {

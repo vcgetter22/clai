@@ -50,6 +50,15 @@ clai sync --server https://clai.acme.internal --token clai_mem_...
 
 Run `clai sync` from a cron job or launchd agent (hourly is plenty). Working directories and git remotes are stripped by default (`--keep-paths` to include them). Only usage metadata is sent, never content.
 
+`clai login --server https://clai.acme.internal` is the interactive alternative to `--token`: it
+first tries the hosted service's device-code sign-in (`POST /api/auth/device`), which a self-hosted
+`clai-server` doesn't implement and answers `404` for (every other unauthenticated, unrecognized
+path also 404s rather than leaking a `401`, so this is a reliable signal, not a guess). On that
+`404`, `clai login` falls back to a prompt that reads a pasted member token from stdin — paste the
+`clai_mem_...` value from `POST /api/admin/tokens` above — and saves it exactly like `--token`
+does, including `sync.server`. `clai login --admin` requests (not grants) an admin-scoped token;
+self-hosted servers have no such distinction to honor and the paste prompt ignores it.
+
 ## Admin connectors
 
 Configure on the server host (or in the compose environment):

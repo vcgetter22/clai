@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import type { XAxisTickContentProps } from 'recharts';
 import { formatDayFull, formatDayShort, formatUsd } from '../format';
 import { BasisLabel, type Basis } from './BasisLabel';
 
@@ -39,12 +40,6 @@ interface Props {
   note?: ReactNode;
 }
 
-interface TickProps {
-  x?: number;
-  y?: number;
-  payload?: { value: string };
-}
-
 /** Part-to-whole over time: stacked bars, axes from zero, gridlines in the rule color, the peak day called out when it is an outlier. */
 export function StackedBarChart({ data, series, colorFor, labelFor, height = 220, basis = 'computed', note }: Props) {
   if (data.length === 0 || series.length === 0) return <div className="no-data">No usage in this range.</div>;
@@ -57,9 +52,9 @@ export function StackedBarChart({ data, series, colorFor, labelFor, height = 220
   const showPeak = ratio >= 3 && peakDay !== '';
   // Weekly ticks from the first day, the last day, and the peak when it is called out.
   const ticks = data.filter((d, i) => (i % 7 === 0 && i < data.length - 3) || i === data.length - 1 || (showPeak && d.day === peakDay)).map((d) => d.day);
-  const renderTick = (p: TickProps) => (
-    <text x={p.x} y={(p.y ?? 0) + 12} textAnchor="middle" fontSize={12} fontFamily="var(--font-mono)" fill={showPeak && p.payload?.value === peakDay ? 'var(--red)' : 'var(--muted)'}>
-      {formatDayShort(p.payload?.value ?? '')}
+  const renderTick = (p: XAxisTickContentProps) => (
+    <text x={p.x} y={Number(p.y) + 12} textAnchor="middle" fontSize={12} fontFamily="var(--font-mono)" fill={showPeak && p.payload?.value === peakDay ? 'var(--red)' : 'var(--muted)'}>
+      {formatDayShort(String(p.payload?.value ?? ''))}
     </text>
   );
   return (

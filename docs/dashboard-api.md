@@ -106,24 +106,77 @@ Catalog joined with usage in range; models without usage are included with zeros
 ## Hosted extensions
 
 The hosted service (`clai-cloud`, a separate private repo) serves the same contract above plus a
-small number of additive fields — existing fields never change meaning or shape, so a client built
-against this document keeps working unmodified against the hosted API. None of this is served by
-`clai` or `clai-server` today; the mock engine (`apps/dashboard/src/mock`) renders it behind
-`?mock=1&hosted=1` (combinable with `?team=1`) so the dashboard can be built and screenshotted
-against it ahead of the hosted API existing.
+small number of additive fields and routes — existing fields never change meaning or shape, so a
+client built against this document keeps working unmodified against the hosted API. The mock
+engine (`apps/dashboard/src/mock`) renders all of it behind `?mock=1&hosted=1` (combinable with
+`?team=1`) so the dashboard can be built and screenshotted against it ahead of the hosted API
+existing.
 
 - `GET /api/health` gains `auth: { kind: 'token' | 'supabase' }`, naming which credential scheme
-  the server accepts (self-hosted team servers only ever accept `clai_*` bearer tokens, so `kind`
-  is `'token'` there; the hosted service also accepts a Supabase-issued JWT).
+  the server accepts. **Served for real by `clai-server` today**, always as `{ kind: 'token' }` in
+  team mode (self-hosted servers only ever accept `clai_*` bearer tokens); the hosted service is
+  the only one that answers `{ kind: 'supabase' }`, which is what the dashboard uses to decide
+  between the plain token prompt and the hosted sign-in screen.
 - `GET /api/whoami` gains, all optional: `email`, `orgId`, `orgs: { id, name }[]`, `plan: 'free' |
-  'plus' | 'team' | 'business'`, `billingStatus: 'active' | 'past_due' | 'canceled' | null`,
-  `upgradeUrl: string | null` (a Stripe Payment Link when the org isn't on a paid plan),
+  'plus' | 'team' | 'business' | 'self-hosted'`, `billingStatus: 'active' | 'past_due' | 'canceled'
+  | null`, `upgradeUrl: string | null` (a Stripe Payment Link when the org isn't on a paid plan),
   `portalUrl: string | null` (the Stripe Billing Portal once subscribed), `tosAccepted: boolean`.
+  **Served for real by `clai-server` today** with inert self-hosted defaults: `email` is the
+  principal's `actorKey` when it looks like one, else `null`; `orgId: null`; `orgs: []`;
+  `plan: 'self-hosted'`; `billingStatus`, `upgradeUrl`, `portalUrl` all `null`; `tosAccepted: true`
+  (there is no ToS gate to run your own server).
 - `POST /v1/ingest`'s response gains `dropped: number` (events rejected for being older than the
   org's retention window; always `0` from a self-hosted server, which has no retention window).
-- New routes, not present on `clai-server`: `/api/auth/*` (Supabase Auth magic-link proxy and the
-  CLI device-code flow) and `/api/me/tokens` (self-service `clai_*` token management).
+  **Served for real today** — `UpsertResult.dropped` is part of the `EventStore` interface.
+- New routes, not present on `clai-server` (it answers `404` for all of them, which is exactly how
+  `clai login` tells a self-hosted server apart from the hosted one — see below): `/api/auth/*`
+  and `/api/me/tokens`.
 
 Team mode's `GET /api/health` is public (no bearer token required) precisely so a load balancer
 or the hosted dashboard's pre-login screen can call it; it never includes `db` (that would leak an
 event count to an unauthenticated caller). `db` is present only in local mode.
+
+### Hosted auth routes (`clai-cloud` only; public unless noted)
+
+All bodies and responses are JSON, camelCase, same conventions as the rest of this contract. These
+back both the dashboard's sign-in screen (`GET /api/health`'s `auth.kind === 'supabase'` is what
+makes the SPA show it instead of the plain token prompt) and `clai login`'s device-code flow.
+
+- `POST /api/auth/link` — sign-in screen "Send sign-in link". Body `{ email: string, tosAccepted:
+  true }` (the checkbox is required client-side; the server re-checks it). Response `{ sent: true
+  }`. Proxies a Supabase Auth magic link; never returns a token directly.
+- `POST /api/auth/verify` — the landing page for that email's link, `#/auth/confirm?token_hash=
+  ...&type=...` (params read from the hash query by `hash.ts`/`App.tsx`, not a real path, since the
+  SPA is hash-routed). Body `{ tokenHash: string, type: string }` (straight from the URL). Response
+  `{ token: string, refreshToken: string }`, stored by the SPA as `localStorage['clai_token']` /
+  `['clai_refresh']`, then `#/auth/confirm` navigates to `#/`.
+- `POST /api/auth/refresh` — called by `apps/dashboard/src/api.ts`'s `realRequest` automatically,
+  at most once per request, when a call 401s and `clai_refresh` is set. Body `{ refreshToken:
+  string }`. Response `{ token: string, refreshToken: string }`; a second 401 after retrying with
+  the new token is treated as a real unauthorized (signs the SPA out).
+- `POST /api/auth/logout` — header "Sign out". Bearer-authenticated; revokes the refresh token
+  server-side. Response `{ ok: true }`. The SPA clears `clai_token`, `clai_refresh` and `clai_org`
+  regardless of whether this call succeeds.
+- `POST /api/auth/device` — public, rate-limited per IP; the first call of `clai login`. Body `{
+  scope: 'admin' | 'member' }` (`--admin` requests, not guarantees, an admin-scoped token — the
+  server still decides based on the signed-in user's actual role). Response `{ deviceCode: string,
+  userCode: string, verificationUrl: string, interval: number, expiresIn: number }`. The CLI prints
+  `userCode` and opens `verificationUrl` (`APP_ORIGIN/#/device?code=<userCode>`).
+- `POST /api/auth/device/token` — polled by `clai login` every `interval` seconds. Body `{
+  deviceCode: string }`. `200` with `{ token: string, actorKey: string, orgId: string | null, role:
+  'admin' | 'member' }` once approved. Before that: `428` (or any status with body `{ error:
+  'authorization_pending' }`) means keep polling; `{ error: 'expired' }` or `{ error: 'denied' }`
+  (any status) means stop and report failure.
+- `POST /api/auth/device/approve` — `#/device`'s "Approve this machine" button, bearer-authenticated
+  (the signed-in browser approves the CLI's pending code). Body `{ userCode: string, orgId: string
+  }`. Response `{ approved: true }`, or an error body when the code is unknown/expired/already used.
+- `POST /api/me/tokens` — header "Connect a machine" panel: mint a `clai_*` token for the caller's
+  own `actorKey`/org without going through the device flow. Bearer-authenticated. Body `{ label:
+  string }`. Response `{ token: string, actorKey: string, role: 'admin' | 'member' }`, shown once
+  with the exact `clai sync --server <origin> --token <token>` command.
+
+### SPA storage keys (`localStorage`)
+
+`clai_token` (bearer access token, sent as `Authorization: Bearer …`), `clai_refresh` (hosted-only
+refresh token, never sent as a header — only in `/api/auth/refresh`'s body), `clai_org` (selected
+org id, sent as `x-clai-org` on every request once set; irrelevant with zero or one org).

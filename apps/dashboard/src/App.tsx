@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ApiError, getBreakdown, getHealth, getWhoami, isMock } from './api';
 import { onUnauthorized } from './authGate';
-import { buildHash, currentRoute, navigateTo, PAGE_LABELS, PAGES, type PageId, type Route } from './hash';
+import { buildHash, currentRoute, isPageId, navigateTo, navigateToRoot, PAGE_LABELS, PAGES, type PageId, type Route } from './hash';
 import type { CommonFilters, HealthResponse, WhoamiResponse } from './types';
+import { AccountBar } from './components/AccountBar';
+import { AuthConfirm } from './components/AuthConfirm';
+import { DeviceApprove } from './components/DeviceApprove';
 import { FilterBar } from './components/FilterBar';
+import { SignIn } from './components/SignIn';
 import { TokenPrompt } from './components/TokenPrompt';
 import { Overview } from './pages/Overview';
 import { Models } from './pages/Models';
@@ -59,20 +63,29 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     setBootError(null);
-    Promise.all([getHealth(), getWhoami()])
-      .then(([h, w]) => {
+    // `/health` and `/whoami` are fetched independently, not via Promise.all: `/health` is always
+    // public (even in team/hosted mode) and its `auth.kind` decides whether an unauthenticated
+    // caller sees the plain TokenPrompt or the hosted SignIn screen, so it must be captured even
+    // when `/whoami` 401s.
+    getHealth()
+      .then((h) => {
         if (cancelled) return;
         setHealth(h);
-        setWhoami(w);
-        setNeedsToken(false);
+        return getWhoami()
+          .then((w) => {
+            if (cancelled) return;
+            setWhoami(w);
+            setNeedsToken(false);
+          })
+          .catch((e: unknown) => {
+            if (cancelled) return;
+            if (e instanceof ApiError && e.status === 401) setNeedsToken(true);
+            else setBootError(e instanceof Error ? e.message : String(e));
+          });
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        if (e instanceof ApiError && e.status === 401) {
-          setNeedsToken(true);
-        } else {
-          setBootError(e instanceof Error ? e.message : String(e));
-        }
+        setBootError(e instanceof Error ? e.message : String(e));
       });
     return () => {
       cancelled = true;
@@ -103,16 +116,28 @@ export default function App() {
     setRoute({ page: route.page, query: q });
   }
 
-  if (needsToken) {
+  function handleTokenSubmit(): void {
+    setAuthAttempted(true);
+    setBootTick((t) => t + 1);
+  }
+
+  // The magic-link landing page runs regardless of auth state — establishing it is its whole job.
+  if (route.page === 'auth/confirm') {
     return (
-      <TokenPrompt
-        error={authAttempted ? 'That token was not accepted. Check it and try again.' : null}
-        onSubmit={() => {
-          setAuthAttempted(true);
+      <AuthConfirm
+        query={route.query}
+        onVerified={() => {
+          setNeedsToken(false);
           setBootTick((t) => t + 1);
+          navigateToRoot();
         }}
       />
     );
+  }
+
+  if (needsToken) {
+    const tokenError = authAttempted ? 'That token was not accepted. Check it and try again.' : null;
+    return health?.auth?.kind === 'supabase' ? <SignIn onTokenSubmit={handleTokenSubmit} tokenError={tokenError} /> : <TokenPrompt error={tokenError} onSubmit={handleTokenSubmit} />;
   }
 
   if (bootError) {
@@ -133,9 +158,16 @@ export default function App() {
     return <div className="loading-note" style={{ padding: 24 }}>Loading clai…</div>;
   }
 
+  // `clai login`'s device flow sends a signed-in browser here to approve a new machine.
+  if (route.page === 'device' && health.auth?.kind === 'supabase') {
+    if (!whoami) return <div className="loading-note" style={{ padding: 24 }}>Loading clai…</div>;
+    return <DeviceApprove userCode={route.query.get('code')} whoami={whoami} />;
+  }
+
   // Team mode's /api/health is public and carries no db stats (no auth => no counts leaked);
   // without them we can't tell an empty server from a full one, so don't claim it's empty.
   const emptyDb = health.db ? health.db.events === 0 : false;
+  const pageForRender: PageId = isPageId(route.page) ? route.page : 'overview';
 
   return (
     <div className="shell">
@@ -159,13 +191,13 @@ export default function App() {
         </nav>
         <div className="topbar-right">
           <span className="privacy-line">{health.mode === 'team' ? 'team · usage metadata only leaves this machine' : 'local · nothing leaves this machine'}</span>
-          {health.mode === 'team' && whoami && <span className="whoami">{whoami.label || whoami.actorKey}</span>}
+          {whoami && (health.auth?.kind === 'supabase' ? <AccountBar whoami={whoami} /> : health.mode === 'team' && <span className="whoami">{whoami.label || whoami.actorKey}</span>)}
         </div>
       </header>
 
       <FilterBar filters={filters} onChange={updateFilters} projects={projects} mock={isMock()} timeZone={health.timeZone} />
 
-      <main className="page-outlet">{renderPage(route.page, filters, health, emptyDb, filtersToQuery)}</main>
+      <main className="page-outlet">{renderPage(pageForRender, filters, health, emptyDb, filtersToQuery)}</main>
     </div>
   );
 }

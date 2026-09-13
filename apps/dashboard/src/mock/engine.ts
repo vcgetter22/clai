@@ -349,17 +349,33 @@ export function health(): HealthResponse {
   const ds = dataset();
   const first = ds.events[0]?.ts ?? null;
   const last = ds.events[ds.events.length - 1]?.ts ?? null;
+  // Hosted is team-shaped (bearer/JWT auth, no unauthenticated db stats) even without `&team=1`;
+  // `?mock=1&team=1` and `?mock=1&empty=1` (neither hosted) are untouched by this.
+  const teamLike = isMockTeam() || isMockHosted();
   return {
     ok: true,
     version: '0.2.0-mock',
-    mode: isMockTeam() ? 'team' : 'local',
+    mode: teamLike ? 'team' : 'local',
     timeZone: 'UTC',
     db: { events: ds.events.length, first, last },
     pricingVersion: '2026-09-03',
-    authRequired: isMockTeam(),
+    authRequired: teamLike,
     ...(isMockHosted() ? { auth: { kind: 'supabase' as const } } : {}),
   };
 }
+
+function selectedMockOrgId(): string | null {
+  try {
+    return localStorage.getItem('clai_org');
+  } catch {
+    return null;
+  }
+}
+
+const MOCK_ORGS = [
+  { id: 'org_mock', name: "Aria's org" },
+  { id: 'org_mock_2', name: 'Acme Inc' },
+];
 
 export function whoami(): WhoamiResponse {
   if (isMockHosted()) {
@@ -368,8 +384,8 @@ export function whoami(): WhoamiResponse {
       role: 'admin',
       label: 'Aria Chen',
       email: 'aria@clai.dev',
-      orgId: 'org_mock',
-      orgs: [{ id: 'org_mock', name: "Aria's org" }],
+      orgId: selectedMockOrgId() ?? MOCK_ORGS[0]!.id,
+      orgs: MOCK_ORGS,
       plan: 'free',
       billingStatus: null,
       upgradeUrl: 'https://buy.stripe.com/mock-plus-monthly',
@@ -379,6 +395,25 @@ export function whoami(): WhoamiResponse {
   }
   if (isMockTeam()) return { actorKey: 'aria@clai.dev', role: 'admin', label: 'Aria Chen' };
   return { actorKey: 'me', role: 'admin', label: 'local' };
+}
+
+// ------------------------------------------------------------- hosted auth
+
+export function authLink(email: string, tosAccepted: boolean): { sent: boolean } {
+  return { sent: Boolean(email.trim()) && tosAccepted };
+}
+
+/** Mock accepts any hash/type, per the "Hosted extensions" appendix. */
+export function authVerify(_tokenHash: string, _type: string): { token: string; refreshToken: string } {
+  return { token: 'clai_mock_hosted_token', refreshToken: 'clai_mock_hosted_refresh' };
+}
+
+export function deviceApprove(_userCode: string, _orgId: string): { approved: boolean } {
+  return { approved: true };
+}
+
+export function mintMachineToken(label: string): { token: string; actorKey: string; role: 'admin' | 'member' } {
+  return { token: `clai_mem_mock_${label.replace(/\s+/g, '-').toLowerCase()}_${Math.random().toString(36).slice(2, 8)}`, actorKey: 'aria@clai.dev', role: 'member' };
 }
 
 export function summary(f: CommonFilters, now: Date = new Date()): SummaryResponse {
