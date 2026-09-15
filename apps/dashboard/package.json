@@ -1,6 +1,6 @@
 {
   "name": "@claii/dashboard",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "clai dashboard: single-page app served by the CLI (local mode) and the team server.",
   "type": "module",
   "files": [

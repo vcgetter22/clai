@@ -7,7 +7,7 @@ import { AccountBar } from './components/AccountBar';
 import { AuthConfirm } from './components/AuthConfirm';
 import { DeviceApprove } from './components/DeviceApprove';
 import { FilterBar } from './components/FilterBar';
-import { SignIn } from './components/SignIn';
+import { Landing } from './components/Landing';
 import { TokenPrompt } from './components/TokenPrompt';
 import { Overview } from './pages/Overview';
 import { Models } from './pages/Models';
@@ -137,7 +137,7 @@ export default function App() {
 
   if (needsToken) {
     const tokenError = authAttempted ? 'That token was not accepted. Check it and try again.' : null;
-    return health?.auth?.kind === 'supabase' ? <SignIn onTokenSubmit={handleTokenSubmit} tokenError={tokenError} /> : <TokenPrompt error={tokenError} onSubmit={handleTokenSubmit} />;
+    return health?.auth?.kind === 'supabase' ? <Landing onTokenSubmit={handleTokenSubmit} tokenError={tokenError} /> : <TokenPrompt error={tokenError} onSubmit={handleTokenSubmit} />;
   }
 
   if (bootError) {

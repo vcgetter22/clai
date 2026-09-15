@@ -6,12 +6,14 @@ interface Props {
   /** Same handler App.tsx gives `TokenPrompt`: stash the pasted token, then re-check auth. */
   onTokenSubmit: () => void;
   tokenError?: string | null;
+  /** Render just the card (inside the landing page) instead of a full-height centered screen. */
+  embedded?: boolean;
 }
 
 type Mode = 'email' | 'sent' | 'token';
 
 /** Hosted sign-in screen (`health.auth?.kind === 'supabase'`): email + magic link, replacing the bare token prompt. */
-export function SignIn({ onTokenSubmit, tokenError }: Props) {
+export function SignIn({ onTokenSubmit, tokenError, embedded = false }: Props) {
   const [mode, setMode] = useState<Mode>('email');
   const [email, setEmail] = useState('');
   const [tosAccepted, setTosAccepted] = useState(false);
@@ -48,10 +50,9 @@ export function SignIn({ onTokenSubmit, tokenError }: Props) {
     }
   }
 
-  return (
-    <div className="token-screen">
+  const card = (
       <div className="token-card">
-        <h1>Sign in to clai</h1>
+        {!embedded && <h1>Sign in to clai</h1>}
         {mode === 'sent' ? (
           <>
             <p>
@@ -93,6 +94,6 @@ export function SignIn({ onTokenSubmit, tokenError }: Props) {
           Have a token?
         </button>
       </div>
-    </div>
   );
+  return embedded ? card : <div className="token-screen">{card}</div>;
 }
