@@ -27,6 +27,11 @@ A formula that wraps `npm install -g @claii/cli` or a Node-bundled tarball; keep
 ## Catalog refresh
 Regenerate `packages/core/src/pricing/catalog.research.json` from a refreshed `research/pricing-catalog.draft.json` with `node scripts/merge-pricing.mjs`, bump `version` in `SEED_CATALOG`, run tests (the catalog integrity test catches alias collisions), and note changes in `docs/decisions.md`. Users pick up the new prices on upgrade and can run `clai pricing reprice`.
 
+## 0.3.2 (`@claii/cli` only)
+- Structure: every command title is a ruled line with its range or elapsed time; `report` opens with a totals card (spend with basis, requests, tokens, today, month with projection, last month) and its breakdowns are ruled sub-sections.
+- Colour: one colour per provider held constant across views, mirroring the dashboard palette (Anthropic green, OpenAI blue, Google amber, Cursor magenta, GitHub grey, Mistral cyan) on provider, model and source rows and their bars; everything else keeps the single accent.
+- Motion: figures count up and bars fill once when a block first appears (about a quarter second, terminal only; off with `--quiet`, `--json`, pipes, CI, `TERM=dumb` or `CLAI_NO_MOTION=1`).
+
 ## 0.3.1 (`@claii/cli` only)
 - Declares `@claii/server` as a dependency: the CLI imports it (`loadCatalog`, `runLocalScan`, `computeSummary`) but the workspace hid the missing entry, so `npx @claii/cli` 0.2.0 and 0.3.0 fail with ERR_MODULE_NOT_FOUND on a standalone install. The other five packages stay at 0.3.0.
 

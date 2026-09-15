@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { box, elapsed, homePath, kvLines, progress, stripAnsi, table, truncate, width } from './ui.js';
+import { bar, box, elapsed, heading, homePath, kvLines, progress, providerOf, reveal, section, stripAnsi, table, truncate, width } from './ui.js';
 
 describe('ui', () => {
   it('table right-aligns numeric columns and measures widths without ANSI codes', () => {
@@ -50,5 +50,39 @@ describe('ui', () => {
     off.stop();
     expect(writes).toEqual([]);
     expect(off.elapsedMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('maps provider ids, source ids and model keys to one provider each', () => {
+    expect(providerOf('anthropic')).toBe('anthropic');
+    expect(providerOf('claude-opus-5')).toBe('anthropic');
+    expect(providerOf('claude-code')).toBe('anthropic');
+    expect(providerOf('gpt-5')).toBe('openai');
+    expect(providerOf('codex-cli')).toBe('openai');
+    expect(providerOf('gemini-2.5-pro')).toBe('google');
+    expect(providerOf('copilot')).toBe('github');
+    expect(providerOf('mixtral-8x22b')).toBe('mistral');
+    expect(providerOf('my-project')).toBe('other');
+  });
+
+  it('bars scale with the share and accept a paint', () => {
+    expect(stripAnsi(bar(0.5, 10))).toBe('█████░░░░░');
+    expect(stripAnsi(bar(1.2, 4))).toBe('████');
+    expect(bar(0.5, 4, (x) => `<${x}>`)).toContain('<██>');
+  });
+
+  it('headings and sections carry a rule', () => {
+    expect(stripAnsi(heading('clai report', '30d'))).toMatch(/^clai report ─+ 30d$/);
+    expect(stripAnsi(section('By model'))).toMatch(/^By model ─+$/);
+  });
+
+  it('reveal prints the final frame once when motion is off, and redraws in place when on', async () => {
+    const off: string[] = [];
+    await reveal((t) => `value ${Math.round(t * 100)}`, { enabled: false, stream: { isTTY: false, write: (x) => off.push(x) } });
+    expect(off).toEqual(['value 100\n']);
+    const on: string[] = [];
+    await reveal((t) => `value ${Math.round(t * 100)}`, { enabled: true, steps: 3, durationMs: 3, stream: { isTTY: true, write: (x) => on.push(x) } });
+    expect(on[0]).toMatch(/^value \d+\n$/);
+    expect(on.filter((x) => x.startsWith('\x1b[1A')).length).toBe(2);
+    expect(on.at(-1)).toBe('value 100\n');
   });
 });

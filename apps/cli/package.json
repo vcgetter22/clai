@@ -1,6 +1,6 @@
 {
   "name": "@claii/cli",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "clai: see what your AI really costs. Tracks Claude, ChatGPT/Codex, Gemini, Cursor, Copilot and API usage with real prices, locally.",
   "type": "module",
   "bin": {

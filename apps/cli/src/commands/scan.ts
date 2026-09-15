@@ -3,7 +3,7 @@ import { parseSince } from '@claii/core';
 import { localConnectors } from '@claii/connectors';
 import { runLocalScan, computeSummary } from '@claii/server';
 import { openContext, type GlobalOptions } from '../context.js';
-import { box, count, dim, elapsed, formatUsd, heading, homePath, kvLines, ok, pct, printJson, table, termWidth, truncate, warn } from '../ui.js';
+import { bold, box, count, dim, elapsed, formatUsd, heading, homePath, kvLines, ok, pct, printJson, providerOf, providerPaint, reveal, table, termWidth, truncate, warn } from '../ui.js';
 
 export function registerScan(program: Command): void {
   program
@@ -54,13 +54,18 @@ export function registerScan(program: Command): void {
         const top = s.byModel[0];
         console.log('');
         console.log(ok(`${count(await ctx.store.countEvents())} events in ${homePath(ctx.store.path, ctx.home)}`));
-        const card: [string, string][] = [
-          ['spend', `${formatUsd(s.totals.usd)}  ${dim(basis)}`],
-          ['this month', `${formatUsd(s.thisMonth.usd)}  ${dim(`projected ${formatUsd(s.forecast.projectedUsd)}`)}`],
-          ['requests', count(s.totals.events)],
-        ];
-        if (top) card.push(['top model', `${top.key}  ${dim(pct(top.share))}`]);
-        console.log(box(kvLines(card), { title: 'last 30 days' }));
+        await reveal(
+          (t) => {
+            const card: [string, string][] = [
+              ['spend', `${bold(formatUsd(s.totals.usd * t))}  ${dim(basis)}`],
+              ['this month', `${formatUsd(s.thisMonth.usd * t)}  ${dim(`projected ${formatUsd(s.forecast.projectedUsd)}`)}`],
+              ['requests', count(Math.round(s.totals.events * t))],
+            ];
+            if (top) card.push(['top model', `${providerPaint(providerOf(top.key))(top.key)}  ${dim(pct(top.share * t))}`]);
+            return box(kvLines(card), { title: 'last 30 days' });
+          },
+          { enabled: ctx.motion },
+        );
         if ((await ctx.store.listSubscriptions()).length === 0) {
           console.log(dim('  Tip: declare your plan so clai can value it, e.g. `clai plan set anthropic max_20x`'));
         }

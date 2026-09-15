@@ -47,9 +47,51 @@ export function table(header: string[], rows: (string | number)[][], align?: Ali
   return out.join('\n');
 }
 
-/** Section title in the accent, with an optional dim meta suffix (range, time zone, elapsed). */
-export function heading(s: string, meta?: string): string {
-  return pc.bold(accent(s)) + (meta ? '  ' + pc.dim(meta) : '');
+const RULE_WIDTH = () => Math.min(termWidth(), 72);
+
+/** Command title: accent, a thin rule to the right, optional dim meta (range, time zone, elapsed). */
+export function heading(title: string, meta?: string): string {
+  const tail = meta ? ' ' + pc.dim(meta) : '';
+  const n = Math.max(3, RULE_WIDTH() - width(title) - (meta ? width(meta) + 1 : 0) - 1);
+  return pc.bold(accent(title)) + ' ' + pc.dim('─'.repeat(n)) + tail;
+}
+
+/** Sub-section title inside a command: bold, with a short rule. */
+export function section(title: string): string {
+  return pc.bold(title) + ' ' + pc.dim('─'.repeat(Math.max(3, 40 - width(title) - 1)));
+}
+
+/**
+ * One colour per provider, held constant across `report` views (design rule 5), mirroring the
+ * dashboard's series palette (apps/dashboard/src/colors.ts): Anthropic is the ledger green,
+ * OpenAI blue, Google amber, Cursor magenta, GitHub grey, Mistral cyan; everything else muted.
+ */
+export type Paint = (s: string) => string;
+const PROVIDER_PAINT: Record<string, Paint> = {
+  anthropic: pc.green,
+  openai: pc.blue,
+  google: pc.yellow,
+  cursor: pc.magenta,
+  github: pc.gray,
+  mistral: pc.cyan,
+};
+
+export function providerPaint(provider: string): Paint {
+  return PROVIDER_PAINT[provider] ?? pc.dim;
+}
+
+/** Provider for a provider id, a source id or a model key (same inference as the dashboard). */
+export function providerOf(key: string): string {
+  const k = key.toLowerCase();
+  if (k in PROVIDER_PAINT || k === 'xai' || k === 'other') return k;
+  if (k.startsWith('claude') || k === 'anthropic-admin' || k === 'claude-export') return 'anthropic';
+  if (/^(gpt|o[1-9]|codex|chatgpt|text-embedding|davinci|openai)/.test(k)) return 'openai';
+  if (k.startsWith('gemini') || k.startsWith('models/')) return 'google';
+  if (k.includes('cursor')) return 'cursor';
+  if (k.includes('copilot')) return 'github';
+  if (k.startsWith('grok')) return 'xai';
+  if (/^(mistral|mixtral|codestral|ministral|magistral|devstral)/.test(k)) return 'mistral';
+  return 'other';
 }
 
 export function rule(w = Math.min(termWidth(), 72)): string {
@@ -84,10 +126,45 @@ export function bold(s: string): string {
   return pc.bold(s);
 }
 
-/** Share bar on one scale: filled part in the accent, remainder dimmed. */
-export function bar(share: number, w = 20): string {
+/** Share bar on one scale: filled part in the accent (or a provider colour), remainder dimmed. */
+export function bar(share: number, w = 20, paint: Paint = accent): string {
   const n = Math.round(Math.max(0, Math.min(1, share)) * w);
-  return accent('█'.repeat(n)) + pc.dim('░'.repeat(w - n));
+  return paint('█'.repeat(n)) + pc.dim('░'.repeat(w - n));
+}
+
+/** Motion is for terminals only: off when piped, in CI, with TERM=dumb or CLAI_NO_MOTION=1. */
+export function motionEnabled(): boolean {
+  return Boolean(process.stdout.isTTY) && !process.env['CI'] && process.env['TERM'] !== 'dumb' && !process.env['CLAI_NO_MOTION'];
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Print a block once, revealed: `frame(t)` renders the block with values scaled by `t` (bars
+ * filling, figures counting up), redrawn in place from t=0 to t=1 over about a quarter second,
+ * ending on the exact final block. Design rule 8: motion explains change the first time a value
+ * appears, nothing loops. Falls back to printing `frame(1)` once when motion is off or the block
+ * is wider than the terminal (where in-place redraws would misalign).
+ */
+export async function reveal(frame: (t: number) => string, opts: { enabled?: boolean; durationMs?: number; steps?: number; stream?: ProgressStream } = {}): Promise<void> {
+  const stream = opts.stream ?? process.stdout;
+  const final = frame(1);
+  const fits = final.split('\n').every((l) => width(l) <= termWidth());
+  if (!(opts.enabled ?? motionEnabled()) || !fits) {
+    stream.write(final + '\n');
+    return;
+  }
+  const steps = opts.steps ?? 8;
+  const pause = (opts.durationMs ?? 260) / steps;
+  let lines = 0;
+  for (let i = 1; i <= steps; i++) {
+    const t = 1 - Math.pow(1 - i / steps, 3); // ease-out
+    const text = i === steps ? final : frame(t);
+    if (lines) stream.write(`\x1b[${lines}A\x1b[J`);
+    stream.write(text + '\n');
+    lines = text.split('\n').length;
+    if (i < steps) await sleep(pause);
+  }
 }
 
 /**

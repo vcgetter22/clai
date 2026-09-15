@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { contextTokens, dayKey, weekdayIndex, addDays } from '@claii/core';
 import { breakdown, computeSummary, toFilter, type QueryOptions } from '@claii/server';
 import { openContext, type GlobalOptions } from '../context.js';
-import { bar, bold, dim, durationHuman, formatTokens, formatUsd, heading, kv, pct, printJson, table } from '../ui.js';
+import { accent, bar, bold, box, count, dim, durationHuman, formatTokens, formatUsd, heading, kvLines, pct, printJson, providerOf, providerPaint, reveal, section, stripAnsi, table } from '../ui.js';
 
 const VIEWS = ['overview', 'daily', 'weekly', 'monthly', 'models', 'projects', 'sessions', 'providers', 'sources', 'people', 'surfaces', 'billing'] as const;
 type View = (typeof VIEWS)[number];
@@ -55,30 +55,47 @@ async function overview(ctx: ReturnType<typeof openContext>, q: QueryOptions): P
   const s = await computeSummary(ctx.store, ctx.catalog, q);
   if (ctx.json) return printJson(s);
   const u = s.totals.usage;
-  console.log(heading(`clai report`) + dim(`  ${q.since ?? '30d'}${q.until ? ` to ${q.until}` : ''} · ${s.range.timeZone}`));
-  console.log(
-    kv([
-      ['Spend', `${bold(formatUsd(s.totals.usd))}${s.totals.billedUsd !== null ? dim(' (billed)') : dim(' (API-equivalent)')}`],
-      ['Requests', `${u.requests.toLocaleString()} across ${s.totals.events.toLocaleString()} events`],
-      ['Tokens', `${formatTokens(contextTokens(u))} in (${formatTokens(u.cacheRead)} cached, ${formatTokens(u.cacheWrite5m + u.cacheWrite1h)} cache writes), ${formatTokens(u.output)} out`],
-      ['Today', formatUsd(s.today.usd)],
-      ['This month', `${formatUsd(s.thisMonth.usd)} so far, projected ${bold(formatUsd(s.forecast.projectedUsd))} ${dim(`(${s.forecast.confidence} confidence)`)}`],
-      ['Last month', formatUsd(s.lastMonth.usd) + (s.forecast.deltaVsLastMonth !== null ? dim(`  ${s.forecast.deltaVsLastMonth >= 0 ? '+' : ''}${pct(s.forecast.deltaVsLastMonth)} projected`) : '')],
-    ]),
+  const range = `${q.since ?? '30d'}${q.until ? ` to ${q.until}` : ''}`;
+  const basis = s.totals.billedUsd !== null ? 'billed' : 'API-equivalent';
+  console.log(heading('clai report', `${range} · ${s.range.timeZone}`));
+  await reveal(
+    (t) =>
+      box(
+        kvLines([
+          ['spend', `${bold(formatUsd(s.totals.usd * t))}  ${dim(basis)}`],
+          ['requests', `${count(Math.round(u.requests * t))}  ${dim(`${count(s.totals.events)} events`)}`],
+          ['tokens', `${formatTokens(contextTokens(u) * t)} in  ${dim(`${formatTokens(u.cacheRead)} cached, ${formatTokens(u.cacheWrite5m + u.cacheWrite1h)} cache writes`)}  ${formatTokens(u.output * t)} out`],
+          ['today', formatUsd(s.today.usd * t)],
+          ['this month', `${formatUsd(s.thisMonth.usd * t)}  ${dim(`projected ${formatUsd(s.forecast.projectedUsd)}, ${s.forecast.confidence} confidence`)}`],
+          ['last month', formatUsd(s.lastMonth.usd * t) + (s.forecast.deltaVsLastMonth !== null ? dim(`  ${s.forecast.deltaVsLastMonth >= 0 ? '+' : ''}${pct(s.forecast.deltaVsLastMonth)} projected`) : '')],
+        ]),
+        { title: range },
+      ),
+    { enabled: ctx.motion },
   );
-  const show = (title: string, rows: { key: string; usd: number; share: number; events: number; usage: { requests: number } }[]) => {
-    if (rows.length === 0) return;
-    console.log('');
-    console.log(heading(title));
-    console.log(table(['', 'share', 'spend', 'requests', ''], rows.slice(0, 8).map((r) => [r.key, pct(r.share), formatUsd(r.usd), String(r.usage.requests || r.events), bar(r.share, 16)]), ['l', 'r', 'r', 'r', 'l']));
-  };
-  show('By provider', s.byProvider);
-  show('By model', s.byModel);
-  show('By project', s.byProject);
-  if (s.bySource.length > 1) show('By source', s.bySource);
+  type Rows = { key: string; usd: number; share: number; events: number; usage: { requests: number } }[];
+  const blocks: [string, Rows, boolean][] = [
+    ['By provider', s.byProvider, true],
+    ['By model', s.byModel, true],
+    ['By project', s.byProject, false],
+  ];
+  if (s.bySource.length > 1) blocks.push(['By source', s.bySource, true]);
+  const present = blocks.filter(([, rows]) => rows.length > 0);
+  if (present.length) {
+    await reveal(
+      (t) =>
+        present
+          .map(([title, rows, byProvider]) => {
+            const paintFor = (key: string) => (byProvider ? providerPaint(providerOf(key)) : accent);
+            return '\n' + section(title) + '\n' + table(['', 'share', 'spend', 'requests', ''], rows.slice(0, 8).map((r) => [byProvider ? paintFor(r.key)(r.key) : r.key, pct(r.share), formatUsd(r.usd), count(r.usage.requests || r.events), bar(r.share * t, 16, paintFor(r.key))]), ['l', 'r', 'r', 'r', 'l']);
+          })
+          .join('\n'),
+      { enabled: ctx.motion },
+    );
+  }
   if (s.subscriptions.length) {
     console.log('');
-    console.log(heading('Subscription value'));
+    console.log(section('Subscription value'));
     for (const x of s.subscriptions) {
       const price = x.subscription.priceMonthly * (x.subscription.seats ?? 1);
       console.log(`  ${bold(x.subscription.label ?? `${x.subscription.provider} ${x.subscription.plan}`)}: ${formatUsd(x.mtdUsd)} API-equivalent this month, projected ${formatUsd(x.projectedUsd)} vs ${formatUsd(price)} price → ${bold(`${x.multiple.toFixed(1)}x`)}`);
@@ -86,7 +103,7 @@ async function overview(ctx: ReturnType<typeof openContext>, q: QueryOptions): P
   }
   if (s.budgets.length) {
     console.log('');
-    console.log(heading('Budgets'));
+    console.log(section('Budgets'));
     for (const b of s.budgets) console.log(`  ${b.budget.name}: ${formatUsd(b.mtdUsd)} of ${formatUsd(b.budget.amountUsd)} (${pct(b.usedPct)} used, ${pct(b.projectedPct)} projected) ${bar(b.usedPct, 16)}`);
   }
   console.log('');
@@ -96,14 +113,18 @@ async function overview(ctx: ReturnType<typeof openContext>, q: QueryOptions): P
 async function dimension(ctx: ReturnType<typeof openContext>, dim: string, q: QueryOptions, limit: number, view: string): Promise<void> {
   const rows = await breakdown(ctx.store, dim, q, limit);
   if (ctx.json) return printJson({ dim, rows });
-  console.log(heading(`clai report ${view}`) + ` ${dimRange(q)}`);
+  console.log(heading(`clai report ${view}`, stripAnsi(dimRange(q)).trim()));
   if (rows.length === 0) return console.log(dimText('  no data in range'));
-  console.log(
-    table(
-      [dim, 'spend', 'share', 'requests', 'input', 'cache read', 'output', ''],
-      rows.map((r) => [r.key, formatUsd(r.usd), pct(r.share), String(r.usage.requests || r.events), formatTokens(r.usage.input + r.usage.cacheWrite5m + r.usage.cacheWrite1h), formatTokens(r.usage.cacheRead), formatTokens(r.usage.output), bar(r.share, 12)]),
-      ['l', 'r', 'r', 'r', 'r', 'r', 'r', 'l'],
-    ),
+  const byProvider = dim === 'provider' || dim === 'model' || dim === 'source';
+  const paintFor = (key: string) => (byProvider ? providerPaint(providerOf(key)) : accent);
+  await reveal(
+    (t) =>
+      table(
+        [dim, 'spend', 'share', 'requests', 'input', 'cache read', 'output', ''],
+        rows.map((r) => [byProvider ? paintFor(r.key)(r.key) : r.key, formatUsd(r.usd), pct(r.share), count(r.usage.requests || r.events), formatTokens(r.usage.input + r.usage.cacheWrite5m + r.usage.cacheWrite1h), formatTokens(r.usage.cacheRead), formatTokens(r.usage.output), bar(r.share * t, 12, paintFor(r.key))]),
+        ['l', 'r', 'r', 'r', 'r', 'r', 'r', 'l'],
+      ),
+    { enabled: ctx.motion },
   );
   const total = rows.reduce((a, r) => a + r.usd, 0);
   console.log(dimText(`  total ${formatUsd(total)} across ${rows.length} ${dim}${rows.length === 1 ? '' : 's'}`));
@@ -123,16 +144,16 @@ async function weekly(ctx: ReturnType<typeof openContext>, q: QueryOptions): Pro
   }
   const rows = [...weeks.entries()].sort(([a], [b]) => a.localeCompare(b));
   if (ctx.json) return printJson({ weeks: rows.map(([week, w]) => ({ week, ...w })) });
-  console.log(heading('clai report weekly') + ` ${dimRange(q)}`);
+  console.log(heading('clai report weekly', stripAnsi(dimRange(q)).trim()));
   const max = Math.max(...rows.map(([, w]) => w.usd), 0.01);
-  console.log(table(['week of', 'spend', 'requests', ''], rows.map(([week, w]) => [week, formatUsd(w.usd), String(w.requests || w.events), bar(w.usd / max, 20)]), ['l', 'r', 'r', 'l']));
+  await reveal((t) => table(['week of', 'spend', 'requests', ''], rows.map(([week, w]) => [week, formatUsd(w.usd), count(w.requests || w.events), bar((w.usd / max) * t, 20)]), ['l', 'r', 'r', 'l']), { enabled: ctx.motion });
 }
 
 async function sessions(ctx: ReturnType<typeof openContext>, q: QueryOptions, limit: number): Promise<void> {
   const filter = toFilter(q, ctx.store.timeZone);
   const rows = await ctx.store.sessions(filter, limit);
   if (ctx.json) return printJson({ sessions: rows });
-  console.log(heading('clai report sessions') + ` ${dimRange(q)}`);
+  console.log(heading('clai report sessions', stripAnsi(dimRange(q)).trim()));
   if (rows.length === 0) return console.log(dimText('  no sessions in range'));
   console.log(
     table(

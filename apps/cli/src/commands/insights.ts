@@ -20,7 +20,7 @@ export function registerInsights(program: Command): void {
         const min = Number(opts.minImpact) || 0;
         const insights = (await computeInsights(ctx.store, ctx.catalog, q)).filter((i) => (i.impactUsdPerMonth ?? Infinity) >= min || i.severity !== 'opportunity');
         if (ctx.json) return printJson({ insights });
-        console.log(heading('clai insights') + dim(`  last ${opts.since}`));
+        console.log(heading('clai insights', `last ${opts.since}`));
         if (insights.length === 0) {
           console.log(dim('  Nothing to report yet. Ingest more data with `clai scan`, or declare a plan with `clai plan set`.'));
           return;
