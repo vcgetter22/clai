@@ -4,7 +4,7 @@ import { writeCredentials } from '@claii/server';
 import { openBrowser } from '../browser.js';
 import { openContext, type GlobalOptions } from '../context.js';
 import { HOSTED_URL } from '../hosted.js';
-import { dim, fail, heading, ok, printJson } from '../ui.js';
+import { dim, fail, heading, ok, printJson, progress, type Progress } from '../ui.js';
 
 /** The slice of `CliContext` this command touches, kept structural (not `SqliteEventStore`) so tests can pass a plain fake. */
 export interface LoginContext {
@@ -37,6 +37,8 @@ export interface LoginDeps {
   /** Prompt on stdout, read a line from stdin (used for the self-hosted paste-a-token fallback). */
   readToken: (question: string) => Promise<string>;
   sleep: (ms: number) => Promise<void>;
+  /** Progress line while polling for the browser approval; optional so tests can omit it. */
+  progress?: (label: string) => Progress;
 }
 
 export function defaultLoginDeps(): LoginDeps {
@@ -52,6 +54,7 @@ export function defaultLoginDeps(): LoginDeps {
       }
     },
     sleep: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+    progress: (label) => progress(label),
   };
 }
 
@@ -108,6 +111,14 @@ export async function runLogin(opts: LoginOptions, ctx: LoginContext, deps: Logi
 
     const intervalMs = Math.max(start.interval, 1) * 1000;
     const deadline = Date.now() + Math.max(start.expiresIn, 1) * 1000;
+    const spin = deps.progress?.('waiting for approval in the browser');
+    try {
+      return await pollForToken();
+    } finally {
+      spin?.stop();
+    }
+
+    async function pollForToken(): Promise<LoginResult> {
     for (;;) {
       await deps.sleep(intervalMs);
       if (Date.now() > deadline) return fail1('The login request expired. Run `clai login` again.', out);
@@ -130,6 +141,7 @@ export async function runLogin(opts: LoginOptions, ctx: LoginContext, deps: Logi
       if (body.error === 'expired') return fail1('The login request expired. Run `clai login` again.', out);
       if (body.error === 'denied') return fail1('Login was denied.', out);
       throw new Error(`Server responded ${pollRes.status}: ${body.error ?? JSON.stringify(body)}`);
+    }
     }
   } catch (err) {
     return fail1((err as Error).message, out);

@@ -1,6 +1,6 @@
 {
   "name": "@claii/store",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "clai storage: the async EventStore interface, a SQLite (node:sqlite) implementation and an injected-primitive conformance suite.",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,7 +27,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@claii/core": "0.2.0"
+    "@claii/core": "0.3.0"
   },
   "license": "MIT",
   "publishConfig": {

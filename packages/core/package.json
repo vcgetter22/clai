@@ -1,6 +1,6 @@
 {
   "name": "@claii/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "clai core: normalized usage events, pricing catalog, cost engine, insights.",
   "type": "module",
   "main": "./dist/index.js",

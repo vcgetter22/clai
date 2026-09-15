@@ -119,19 +119,29 @@ export async function ingest(opts: RunnerOptions, source: string, events: AsyncI
   return result;
 }
 
-export async function runLocalScan(opts: RunnerOptions, scan: ScanOptions = {}, only?: string[]): Promise<RunResult[]> {
+/** Optional callbacks for progress display; the CLI's `clai scan` uses them, servers ignore them. */
+export interface ScanHooks {
+  onStart?: (source: string) => void;
+  onResult?: (result: RunResult) => void;
+}
+
+export async function runLocalScan(opts: RunnerOptions, scan: ScanOptions = {}, only?: string[], hooks: ScanHooks = {}): Promise<RunResult[]> {
   const out: RunResult[] = [];
   for (const c of localConnectors as LocalConnector[]) {
     if (only && !only.includes(c.id)) continue;
+    hooks.onStart?.(c.id);
     const ctx = await connectorContext(opts, c.id);
     const det = await c.detect(ctx);
     if (!det.found) {
-      out.push({ source: c.id, seen: 0, inserted: 0, updated: 0, unchanged: 0, unpriced: 0, unpricedModels: [], error: null, durationMs: 0, detail: det.summary });
+      const skipped: RunResult = { source: c.id, seen: 0, inserted: 0, updated: 0, unchanged: 0, unpriced: 0, unpricedModels: [], error: null, durationMs: 0, detail: det.summary };
+      out.push(skipped);
+      hooks.onResult?.(skipped);
       continue;
     }
     const r = await ingest(opts, c.id, c.scan(ctx, scan), ctx);
     r.detail = det.summary;
     out.push(r);
+    hooks.onResult?.(r);
   }
   return out;
 }

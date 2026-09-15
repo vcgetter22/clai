@@ -1,6 +1,6 @@
 {
   "name": "@claii/server",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "clai team server: receives synced usage from clai CLIs, pulls org connectors, serves the team dashboard and API.",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,10 +15,10 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@claii/connectors": "0.2.0",
-    "@claii/core": "0.2.0",
-    "@claii/dashboard": "0.2.0",
-    "@claii/store": "0.2.0",
+    "@claii/connectors": "0.3.0",
+    "@claii/core": "0.3.0",
+    "@claii/dashboard": "0.3.0",
+    "@claii/store": "0.3.0",
     "@hono/node-server": "^1.14.0",
     "hono": "^4.9.0"
   },

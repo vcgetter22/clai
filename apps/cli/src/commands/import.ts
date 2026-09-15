@@ -36,8 +36,13 @@ export function registerImport(program: Command): void {
           const available = (importConnectors as ImportConnector[]).map((c) => c.id).join(', ') || 'none registered';
           throw new Error(`Could not detect the export format of ${file}. Use --source <id> (available: ${available}).`);
         }
-        ctx.log.info(`importing with ${connector.displayName}...`);
-        const r = await runImport(ctx.runner, connector, path, { plan: opts.plan, model: opts.model, estimate: opts.estimate });
+        const spin = ctx.progress(`importing with ${connector.displayName}`);
+        let r;
+        try {
+          r = await runImport(ctx.runner, connector, path, { plan: opts.plan, model: opts.model, estimate: opts.estimate });
+        } finally {
+          spin.stop();
+        }
         if (ctx.json) return printJson({ result: r });
         console.log(heading('clai import'));
         console.log(r.error ? fail(r.error) : ok(`${connector.displayName}: ${r.seen} messages seen, ${r.inserted} new, ${r.updated} updated${r.unpriced ? `, ${r.unpriced} unpriced` : ''}`));

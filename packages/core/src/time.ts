@@ -143,7 +143,8 @@ export function formatUsd(n: number | null | undefined, opts: { compact?: boolea
   if (n === null || n === undefined || Number.isNaN(n)) return '-';
   const abs = Math.abs(n);
   if (opts.compact && abs >= 1000) return `$${(n / 1000).toFixed(abs >= 10000 ? 0 : 1)}k`;
-  if (abs >= 100) return `$${n.toFixed(0)}`;
+  // Whole dollars from $100 up, thousands grouped (docs/design-principles.md rule 3: `$1,234`).
+  if (abs >= 100) return `$${Math.round(n).toLocaleString('en-US')}`;
   if (abs >= 1) return `$${n.toFixed(2)}`;
   if (abs >= 0.01) return `$${n.toFixed(3)}`;
   if (abs === 0) return '$0';

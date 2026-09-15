@@ -6,6 +6,7 @@ import { defaultDbPath } from '@claii/store';
 import { SqliteEventStore } from '@claii/store/sqlite';
 import { loadCatalog, type RunnerOptions } from '@claii/server';
 import pc from 'picocolors';
+import { progress, type Progress } from './ui.js';
 
 export interface GlobalOptions {
   json?: boolean;
@@ -25,6 +26,8 @@ export interface CliContext {
   json: boolean;
   version: string;
   runner: RunnerOptions;
+  /** Progress line on stderr while a command works; a no-op with --quiet, --json or a non-TTY stderr. */
+  progress: (label: string) => Progress;
   close: () => Promise<void>;
 }
 
@@ -70,6 +73,7 @@ export function openContext(opts: GlobalOptions = {}): CliContext {
     json: !!opts.json,
     version: cliVersion(),
     runner,
+    progress: (label) => progress(label, opts.quiet || opts.json ? { enabled: false } : {}),
     close: () => store.close(),
   };
 }

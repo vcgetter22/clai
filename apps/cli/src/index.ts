@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import pc from 'picocolors';
+import { accent, bold, dim } from './ui.js';
 import { cliVersion } from './context.js';
 import { registerAsk } from './commands/ask.js';
 import { registerConnect } from './commands/connect.js';
@@ -37,23 +38,47 @@ export function buildProgram(): Command {
     .option('-q, --quiet', 'suppress progress output', false)
     .option('-v, --verbose', 'debug output', false)
     .showHelpAfterError()
-    .configureOutput({ outputError: (str, write) => write(pc.red(str)) });
+    .configureOutput({ outputError: (str, write) => write(pc.red(str)) })
+    // Help styling (design principles rule 2): titles and command names in the accent, nothing else colored.
+    .configureHelp({
+      styleTitle: (str) => bold(accent(str)),
+      styleSubcommandTerm: (str) => accent(str),
+      styleOptionTerm: (str) => bold(str),
+      styleDescriptionText: (str) => str,
+    })
+    .addHelpText('after', '\n' + dim('  Only usage metadata is read (token counts, model ids, timestamps); prompt content is never stored.') + '\n' + dim('  Docs and source: https://github.com/vcgetter22/clai'));
 
+  // Registration order is help order within each group.
   registerScan(program);
   registerReport(program);
   registerInsights(program);
   registerStatus(program);
   registerDashboard(program);
-  registerSettings(program);
   registerConnect(program);
   registerImport(program);
+  registerExport(program);
   registerLogin(program);
   registerSync(program);
-  registerExport(program);
+  registerSettings(program);
   registerPricing(program);
   registerDoctor(program);
   registerAsk(program);
+  groupCommands(program);
   return program;
+}
+
+const GROUPS: Record<string, string[]> = {
+  'Numbers:': ['scan', 'report', 'insights', 'status', 'dashboard'],
+  'Sources:': ['connect', 'disconnect', 'pull', 'import', 'export'],
+  'Team and hosted:': ['login', 'sync'],
+  'Setup and tools:': ['plan', 'budget', 'seat', 'config', 'pricing', 'doctor', 'ask'],
+};
+
+function groupCommands(program: Command): void {
+  for (const cmd of program.commands) {
+    const group = Object.entries(GROUPS).find(([, names]) => names.includes(cmd.name()))?.[0];
+    if (group) cmd.helpGroup(group);
+  }
 }
 
 export async function run(argv: string[]): Promise<void> {

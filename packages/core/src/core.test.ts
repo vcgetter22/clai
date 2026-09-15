@@ -96,7 +96,9 @@ describe('time', () => {
     expect(formatUsd(0)).toBe('$0');
     expect(formatUsd(0.00123)).toBe('$0.0012');
     expect(formatUsd(12.345)).toBe('$12.35');
-    expect(formatUsd(1234)).toBe('$1234');
+    expect(formatUsd(1234)).toBe('$1,234');
+    expect(formatUsd(999.4)).toBe('$999');
+    expect(formatUsd(-2957)).toBe('$-2,957');
     expect(formatUsd(1234, { compact: true })).toBe('$1.2k');
     expect(formatTokens(1234)).toBe('1.2k');
     expect(formatTokens(12_345_678)).toBe('12.3M');

@@ -87,11 +87,16 @@ export function registerConnect(program: Command): void {
         const since = opts.since ? parseSince(opts.since, new Date(), ctx.store.timeZone) : undefined;
         const until = opts.until ? new Date(opts.until).toISOString() : undefined;
         const results = [];
-        for (const c of targets) {
-          const { creds, missing } = resolveCredentials(c, ctx.env);
-          if (missing.length) throw new Error(`${c.id}: missing credentials ${missing.join(', ')} (run clai connect ${c.id})`);
-          ctx.log.info(`pulling ${c.displayName}...`);
-          results.push(await runApiPull(ctx.runner, c, { since, until, full: opts.full }, creds));
+        const spin = ctx.progress('pulling');
+        try {
+          for (const c of targets) {
+            const { creds, missing } = resolveCredentials(c, ctx.env);
+            if (missing.length) throw new Error(`${c.id}: missing credentials ${missing.join(', ')} (run clai connect ${c.id})`);
+            spin.update(`pulling ${c.displayName}`);
+            results.push(await runApiPull(ctx.runner, c, { since, until, full: opts.full }, creds));
+          }
+        } finally {
+          spin.stop();
         }
         if (ctx.json) return printJson({ results });
         console.log(heading('clai pull'));

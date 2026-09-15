@@ -3,7 +3,7 @@ import { parseSince, type UsageEvent } from '@claii/core';
 import { readCredentialsFile, writeCredentials } from '@claii/server';
 import { openContext, type GlobalOptions } from '../context.js';
 import { HOSTED_URL } from '../hosted.js';
-import { dim, fail, heading, ok, printJson } from '../ui.js';
+import { count, dim, elapsed, fail, heading, ok, printJson } from '../ui.js';
 
 /** Remove local paths before sharing with a team; keeps the project label. */
 export function stripPaths(e: UsageEvent): UsageEvent {
@@ -45,6 +45,8 @@ export function registerSync(program: Command): void {
         let dropped = 0;
         let maxTs = last ?? '';
         let chunk: UsageEvent[] = [];
+        const started = Date.now();
+        const spin = ctx.progress(`syncing to ${server}`);
         const sendChunk = async () => {
           if (chunk.length === 0) return;
           const res = await fetch(`${server}/api/v1/ingest`, {
@@ -62,20 +64,24 @@ export function registerSync(program: Command): void {
           updated += r.updated;
           dropped += r.dropped ?? 0;
           for (const e of chunk) if (e.ts > maxTs) maxTs = e.ts;
-          ctx.log.debug(`sent ${sent}`);
+          spin.update(`sent ${count(sent)} events to ${server}`);
           chunk = [];
         };
         // Batch straight from the store's async iterator instead of materializing every event
         // up front, so a first sync over a large store doesn't hold it all in memory at once.
-        for await (const e of ctx.store.iterateEvents(since ? { since } : {})) {
-          chunk.push(opts.keepPaths ? e : stripPaths(e));
-          if (chunk.length >= batchSize) await sendChunk();
+        try {
+          for await (const e of ctx.store.iterateEvents(since ? { since } : {})) {
+            chunk.push(opts.keepPaths ? e : stripPaths(e));
+            if (chunk.length >= batchSize) await sendChunk();
+          }
+          await sendChunk();
+        } finally {
+          spin.stop();
         }
-        await sendChunk();
         if (maxTs) await ctx.store.setSetting('sync.last_ts', maxTs);
         if (ctx.json) return printJson({ server, sent, inserted, updated, dropped, since });
-        console.log(heading('clai sync'));
-        console.log(ok(`sent ${sent} events to ${server} (${inserted} new, ${updated} updated on the server)`));
+        console.log(heading('clai sync', elapsed(Date.now() - started)));
+        console.log(ok(`sent ${count(sent)} events to ${server}  ${dim(`${count(inserted)} new, ${count(updated)} updated on the server`)}`));
         if (!opts.keepPaths) console.log(dim('  Working directories and git remotes were stripped; project labels were kept.'));
         if (dropped > 0) console.log(dim(`  ${dropped} events older than your plan's history window were not stored`));
       } catch (err) {

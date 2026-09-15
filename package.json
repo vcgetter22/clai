@@ -2,7 +2,7 @@
   "name": "clai-monorepo",
   "private": true,
   "type": "module",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "clai — the single source of truth for AI usage and cost across Claude, ChatGPT, Codex, Gemini, Cursor, Copilot and your APIs.",
   "workspaces": [
     "packages/*",
