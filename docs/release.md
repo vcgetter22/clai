@@ -27,6 +27,9 @@ A formula that wraps `npm install -g @claii/cli` or a Node-bundled tarball; keep
 ## Catalog refresh
 Regenerate `packages/core/src/pricing/catalog.research.json` from a refreshed `research/pricing-catalog.draft.json` with `node scripts/merge-pricing.mjs`, bump `version` in `SEED_CATALOG`, run tests (the catalog integrity test catches alias collisions), and note changes in `docs/decisions.md`. Users pick up the new prices on upgrade and can run `clai pricing reprice`.
 
+## 0.3.1 (`@claii/cli` only)
+- Declares `@claii/server` as a dependency: the CLI imports it (`loadCatalog`, `runLocalScan`, `computeSummary`) but the workspace hid the missing entry, so `npx @claii/cli` 0.2.0 and 0.3.0 fail with ERR_MODULE_NOT_FOUND on a standalone install. The other five packages stay at 0.3.0.
+
 ## 0.3.0 (first published version)
 - CLI: progress line with elapsed time while `scan`, `sync`, `import`, `pull` and `login` work (stderr, terminal only; off with `--quiet`, `--json`, pipes and CI); a summary card after `scan` with the basis label; grouped, styled help; the ledger palette from docs/design-principles.md (one green accent, amber warnings, red critical) instead of cyan.
 - Core: `formatUsd` groups thousands (`$2,957`).
