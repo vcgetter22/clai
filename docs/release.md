@@ -28,7 +28,7 @@ A formula that wraps `npm install -g @claii/cli` or a Node-bundled tarball; keep
 Regenerate `packages/core/src/pricing/catalog.research.json` from a refreshed `research/pricing-catalog.draft.json` with `node scripts/merge-pricing.mjs`, bump `version` in `SEED_CATALOG`, run tests (the catalog integrity test catches alias collisions), and note changes in `docs/decisions.md`. Users pick up the new prices on upgrade and can run `clai pricing reprice`.
 
 ## clai for Mac
-1. Bump the workspace version (all packages move together since 0.4.0) and push; `.github/workflows/mac.yml` builds, tests and smoke-tests the app on macos-26 and uploads `clai-mac` and `screenshots` artifacts.
+1. Push the change; `.github/workflows/mac.yml` builds, tests and smoke-tests the app on macos-26 and uploads `clai-mac` and `screenshots` artifacts. The app's version comes from its tag (`mac-v0.4.1` builds 0.4.1), so an app-only release needs no npm version bump; the engine inside reports the CLI's version, and the npm packages move together on their own schedule (above).
 2. Publish `mac-v<version>`, either way:
    - push a tag: `git tag mac-v<version> <commit> && git push origin mac-v<version>`;
    - or GitHub's web form: Releases, "Draft a new release", type `mac-v<version>` as a new tag on the branch that holds the release commit, then Publish.
@@ -36,6 +36,11 @@ Regenerate `packages/core/src/pricing/catalog.research.json` from a refreshed `r
    The workflow's release job builds again and attaches `clai-mac-arm64.dmg`, `clai-mac-x64.dmg`, the two zips and `checksums.txt` with the standard notes (replacing notes typed into the form). The release becomes "latest". From the web form, the download links return GitHub's 404 for about ten minutes, until the files are attached. Claude Code cloud sessions cannot push tags, so this step is the founder's.
 3. getclai.vercel.app needs no change for a new release: `/download/mac`, `/download/mac-intel` and `install.sh` always resolve to the latest release. Update the version shown on the page (`data-version` in apps/site/public/index.html) and, if the panel changed, `panel-light.png` / `panel-dark.png` from the `screenshots` artifact.
 4. Signing: ad hoc until the repository has the Developer ID secrets listed in apps/mac/README.md; then the same workflow signs and notarizes.
+
+## clai for Mac 0.4.1 (app only; npm stays at 0.4.0)
+- Quieter look: no bubbles, gloss or glow; SF Pro instead of the rounded font; flat buttons; system-style tabs; the month on a plain ledger-green card; no count-up or rise-in animations; a new icon without bubbles. getclai.vercel.app follows suit.
+- The menu bar shows this month's spend by default, the panel's headline figure. Today and icon-only stay in Settings. With no usage yet today it used to read "$0".
+- Release builds take their version from the `mac-v*` tag.
 
 ## 0.4.0 (all packages, clai for Mac)
 - CLI: `clai snapshot [--scan]`, one JSON document (schema 1) with everything a glanceable surface shows; `clai login` defaults to https://clai-cloud.vercel.app.

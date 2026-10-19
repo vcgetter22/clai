@@ -79,7 +79,11 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-        run: apps/mac/scripts/package.sh
+        # A release build takes its version from the tag (mac-v0.4.1 builds 0.4.1); other builds
+        # use the CLI's version.
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/mac-v* ]]; then export VERSION="${GITHUB_REF#refs/tags/mac-v}"; fi
+          apps/mac/scripts/package.sh
       - name: Smoke test (arm64 app)
         run: ARCH=arm64 apps/mac/scripts/smoke-test.sh
       - name: Screenshots

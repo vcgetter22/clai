@@ -26,7 +26,7 @@ log() { printf '\n\033[1;32m==>\033[0m %s\n' "$*"; }
 rm -rf "$DIST"
 mkdir -p "$OUT" "$DIST"
 
-log "Engine bundle ($VERSION)"
+log "Engine bundle"
 node "$ROOT/scripts/bundle-engine.mjs" "$OUT/engine"
 
 log "Swift build (universal)"
@@ -71,7 +71,7 @@ notarize() {
 curl -fsSL -o "$OUT/SHASUMS256.txt" "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt"
 
 for arch in $ARCHS; do
-  log "clai.app for $arch (Node $NODE_VERSION)"
+  log "clai.app $VERSION for $arch (Node $NODE_VERSION)"
   STAGE="$OUT/$arch"
   APP="$STAGE/clai.app"
   rm -rf "$STAGE"

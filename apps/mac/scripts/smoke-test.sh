@@ -18,7 +18,7 @@ trap 'rm -rf "$WORK"' EXIT
 # Run a command with a time limit (macOS has no `timeout`).
 limit() { perl -e 'alarm shift; exec @ARGV' "$@"; }
 
-echo "app: $APP"
+echo "app: $APP ($(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist"))"
 file "$NODE" "$APP/Contents/MacOS/clai"
 codesign --verify --deep --strict "$APP"
 codesign -dv "$APP" 2>&1 | grep -E "Identifier|Signature|TeamIdentifier" || true
