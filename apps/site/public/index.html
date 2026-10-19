@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>clai for Mac</title>
+    <meta name="description" content="Your AI spend, live in the menu bar. clai reads the usage logs Claude Code, Codex, Gemini CLI and other tools keep on your Mac, prices every token at list price and shows what your plan is worth. Free, open source, local." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f3f7f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b1210" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://getclai.vercel.app/" />
+    <meta property="og:title" content="clai for Mac: your AI spend, live in the menu bar" />
+    <meta property="og:description" content="Prices every token Claude Code, Codex and Gemini CLI log on your Mac and shows what your plan is worth. Free, open source, local." />
+    <meta property="og:image" content="https://getclai.vercel.app/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>document.documentElement.classList.add('js')</script>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/site.js" defer></script>
+  </head>
+  <body>
+    <div class="sky" aria-hidden="true">
+      <span class="blob blob-a"></span>
+      <span class="blob blob-b"></span>
+      <span class="blob blob-c"></span>
+      <span class="bubble b1"></span>
+      <span class="bubble b2"></span>
+      <span class="bubble b3"></span>
+      <span class="bubble b4"></span>
+      <span class="bubble b5"></span>
+      <span class="bubble b6"></span>
+    </div>
+
+    <header class="nav">
+      <a class="brand" href="/" aria-label="clai home">
+        <img src="/icon-180.png" alt="" width="30" height="30" />
+        <span>clai</span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#how">How it works</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#terminal">Terminal</a>
+        <a href="https://github.com/vcgetter22/clai">GitHub</a>
+      </nav>
+      <a class="btn btn-small" href="/download/mac" data-download>Download</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy reveal">
+          <p class="eyebrow"><span class="dot"></span>clai for Mac · free and open source</p>
+          <h1>Your AI spend, live in the menu bar.</h1>
+          <p class="lede">
+            clai reads the usage logs that Claude Code, Codex, Gemini CLI and other tools already keep on your Mac, prices every token at list price, and shows today, this month and what your plan is worth.
+          </p>
+          <div class="cta">
+            <a class="btn btn-primary" href="/download/mac" data-download>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              <span data-download-label>Download for Mac</span>
+            </a>
+            <div class="cta-meta">
+              <span data-download-meta>Apple silicon · 32 MB · macOS 14 or later</span>
+              <a href="/download/mac-intel" data-other-arch>Intel Mac? Get the Intel version</a>
+            </div>
+          </div>
+          <div class="term" role="group" aria-label="Install from Terminal">
+            <span class="term-prompt" aria-hidden="true">$</span>
+            <code id="install-cmd">curl -fsSL https://getclai.vercel.app/install.sh | sh</code>
+            <button class="copy" type="button" data-copy="install-cmd" aria-label="Copy the install command">Copy</button>
+          </div>
+          <p class="fineprint">Version <span data-version>0.4.0</span>. The Terminal install skips the first-launch prompt; the download needs <a href="#first-launch">one extra click</a> the first time.</p>
+        </div>
+
+        <figure class="stage reveal" aria-label="The clai menu bar panel">
+          <div class="menubar">
+            <span class="menubar-left" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="menubar-right">
+              <span class="mb-item mb-clai" title="clai in the menu bar">
+                <svg viewBox="0 0 18 15" width="16" height="13" aria-hidden="true"><g stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.6 2.5v10M6.9 2.5v10M10.2 2.5v10M13.5 2.5v10M1.6 11.4 16.4 3.6" /></g></svg>
+                <span>$68</span>
+              </span>
+              <span class="mb-item" aria-hidden="true">
+                <svg viewBox="0 0 20 14" width="18" height="13"><path d="M10 12.5 1.8 4.3a11.6 11.6 0 0 1 16.4 0z" fill="currentColor" /></svg>
+              </span>
+              <span class="mb-item" aria-hidden="true">
+                <svg viewBox="0 0 28 13" width="25" height="12"><rect x="0.5" y="0.5" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".5" /><rect x="2.5" y="2.5" width="16" height="8" rx="2" fill="currentColor" /><rect x="25" y="4.2" width="2" height="4.6" rx="1" fill="currentColor" opacity=".5" /></svg>
+              </span>
+              <span class="mb-item mb-clock" aria-hidden="true">Mon 19 Oct 10:41</span>
+            </span>
+          </div>
+          <div class="panel-wrap">
+            <picture>
+              <source srcset="/panel-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)" />
+              <source srcset="/panel-dark.png" media="(prefers-color-scheme: dark)" />
+              <source srcset="/panel-light.webp" type="image/webp" />
+              <img class="panel" src="/panel-light.png" width="368" height="720" alt="The clai panel: October so far $1,082 API-equivalent, on pace for $1,737; today $67.76; 7 days $606; plan value 12.3 times Claude Max 5x; a 30-day bar chart; tools Claude Code, Codex CLI and Gemini CLI." />
+            </picture>
+          </div>
+          <figcaption>The real app, drawn with sample data.</figcaption>
+        </figure>
+      </section>
+
+      <section class="proof reveal" aria-labelledby="proof-title">
+        <div class="proof-bubble">
+          <p class="proof-figure" id="proof-title"><span data-count-to="38.6" data-count-decimals="1">38.6</span>×</p>
+          <div>
+            <p class="proof-text">One Claude Max 5x plan, $100 a month, delivered <strong>$3,865</strong> of API-priced work in August 2026.</p>
+            <p class="basis">API-equivalent at Anthropic list prices · one developer's machine · computed by clai</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="how" aria-labelledby="how-title">
+        <h2 id="how-title" class="reveal">What the bubble tells you</h2>
+        <div class="features">
+          <article class="card reveal">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 18V6m5 12V9m5 9v-5m5 5V4" /></svg></span>
+            <h3>Today, at a glance</h3>
+            <p>The menu bar shows today's spend and updates a few seconds after Claude Code, Codex or Gemini CLI write to their logs.</p>
+          </article>
+          <article class="card reveal">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></svg></span>
+            <h3>What your plan is worth</h3>
+            <p>Tell clai you pay for Claude Max, ChatGPT Pro or Cursor and it shows the API-priced value of what you used, as a multiple of the price.</p>
+          </article>
+          <article class="card reveal">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="9" r="3.5" /><circle cx="16.5" cy="14.5" r="5" /><circle cx="7" cy="17.5" r="2" /></svg></span>
+            <h3>Where it went</h3>
+            <p>This month by tool, model and project, and a 30-day chart that reads out any day you point at.</p>
+          </article>
+          <article class="card reveal">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 1-8 8" /><path d="M12 4v8h8" /></svg></span>
+            <h3>Before the month ends</h3>
+            <p>A forecast for the month, and a budget ring that turns amber when your pace would take you past it.</p>
+          </article>
+          <article class="card reveal">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z" /></svg></span>
+            <h3>Tips with numbers</h3>
+            <p>Model mix, cache efficiency and context size, each with what changing it would save per month.</p>
+          </article>
+          <article class="card reveal">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="3" /><path d="M7 14l3-3 3 2 4-5" /></svg></span>
+            <h3>The full dashboard, one click away</h3>
+            <p>Sessions, models, plans and every event, served from your own Mac at 127.0.0.1.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section split reveal" id="privacy" aria-labelledby="privacy-title">
+        <div>
+          <h2 id="privacy-title">Nothing to sign up for. Your usage stays on your Mac.</h2>
+          <p class="section-lede">clai has no account and sends no telemetry. It reads the files your tools already write and keeps its own database in <code>~/.clai</code>.</p>
+        </div>
+        <ul class="ticks">
+          <li><b>Reads</b> token counts, model names, timestamps and project folder names.</li>
+          <li><b>Never reads</b> your prompts, code or the replies you get.</li>
+          <li><b>Prices</b> with a catalog of 147 models, cache and long-context rules included, labelled API-equivalent.</li>
+          <li><b>Talks to the internet</b> only to ask GitHub once a day whether a newer clai exists, and you can turn that off.</li>
+        </ul>
+      </section>
+
+      <section class="section reveal" aria-labelledby="tools-title">
+        <h2 id="tools-title">Works with the tools you already use</h2>
+        <ul class="chips">
+          <li>Claude Code</li>
+          <li>Codex CLI</li>
+          <li>Gemini CLI</li>
+          <li>OpenCode</li>
+          <li>Cline and Roo Code</li>
+          <li>Aider</li>
+        </ul>
+        <p class="section-lede">Teams add the Anthropic, OpenAI, Cursor, GitHub Copilot and OpenRouter admin APIs through the command line and a self-hosted team server.</p>
+      </section>
+
+      <section class="section split reveal" id="terminal" aria-labelledby="terminal-title">
+        <div>
+          <h2 id="terminal-title">Prefer the terminal?</h2>
+          <p class="section-lede">The app runs the same engine as the clai command line tool, which also works on Linux and Windows.</p>
+        </div>
+        <pre class="codeblock"><code>npx @claii/cli scan
+npx @claii/cli plan set anthropic max_5x
+npx @claii/cli report
+npx @claii/cli dashboard</code></pre>
+      </section>
+
+      <section class="section reveal" id="first-launch" aria-labelledby="faq-title">
+        <h2 id="faq-title">Installing</h2>
+        <div class="faq">
+          <details open>
+            <summary>The first time you open clai</summary>
+            <p>clai is not notarized by Apple yet, so macOS says it cannot check clai for malicious software. Click <b>Done</b>, open <b>System Settings → Privacy &amp; Security</b>, scroll to the message about clai and click <b>Open Anyway</b>, then confirm. macOS remembers the choice.</p>
+            <p>The Terminal install above avoids the prompt because files that <code>curl</code> downloads are not marked as coming from the internet.</p>
+          </details>
+          <details>
+            <summary>Apple silicon or Intel?</summary>
+            <p>Apple menu → About This Mac: a chip named M1 or later is Apple silicon; an Intel processor needs the <a href="/download/mac-intel">Intel version</a>. Both need macOS 14 Sonoma or later.</p>
+          </details>
+          <details>
+            <summary>Why is the download 32 MB?</summary>
+            <p>clai brings its own copy of Node.js to run the pricing engine, so there is nothing else to install. Installed, it takes about 140 MB, nearly all of it Node; the app itself is a few megabytes of Swift. The Intel download is 34 MB.</p>
+          </details>
+          <details>
+            <summary>Checking the download</summary>
+            <p>Every release lists SHA-256 checksums on <a href="https://github.com/vcgetter22/clai/releases/latest">GitHub</a>. In Terminal: <code>shasum -a 256 ~/Downloads/clai-mac-arm64.dmg</code></p>
+          </details>
+          <details>
+            <summary>Removing clai</summary>
+            <p>Quit clai from its menu, drag clai from Applications to the Trash, and delete the <code>~/.clai</code> folder if you also want its database gone.</p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span class="brand-small"><img src="/icon-180.png" alt="" width="20" height="20" />clai</span>
+      <a href="https://github.com/vcgetter22/clai">Source</a>
+      <a href="https://github.com/vcgetter22/clai/releases">Releases</a>
+      <a href="https://github.com/vcgetter22/clai/issues">Support</a>
+      <span class="muted">MIT License</span>
+    </footer>
+  </body>
+</html>
