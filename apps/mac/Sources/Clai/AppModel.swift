@@ -61,9 +61,9 @@ final class AppModel {
     @ObservationIgnored private var lastUpdateCheck: Date?
     @ObservationIgnored private var started = false
 
-    init(engine: Engine?, prefs: Preferences = Preferences(), demo: Snapshot? = nil) {
+    init(engine: Engine?, prefs: Preferences? = nil, demo: Snapshot? = nil) {
         self.engine = engine
-        self.prefs = prefs
+        self.prefs = prefs ?? Preferences()
         self.isDemo = demo != nil
         self.appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
         if let demo {
