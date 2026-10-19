@@ -29,7 +29,11 @@ Regenerate `packages/core/src/pricing/catalog.research.json` from a refreshed `r
 
 ## clai for Mac
 1. Bump the workspace version (all packages move together since 0.4.0) and push; `.github/workflows/mac.yml` builds, tests and smoke-tests the app on macos-26 and uploads `clai-mac` and `screenshots` artifacts.
-2. Tag the commit `mac-v<version>` and push the tag; the workflow's release job publishes `clai-mac-arm64.dmg`, `clai-mac-x64.dmg`, the two zips and `checksums.txt` as a GitHub release, which becomes "latest".
+2. Publish `mac-v<version>`, either way:
+   - push a tag: `git tag mac-v<version> <commit> && git push origin mac-v<version>`;
+   - or GitHub's web form: Releases, "Draft a new release", type `mac-v<version>` as a new tag on the branch that holds the release commit, then Publish.
+
+   The workflow's release job builds again and attaches `clai-mac-arm64.dmg`, `clai-mac-x64.dmg`, the two zips and `checksums.txt` with the standard notes (replacing notes typed into the form). The release becomes "latest". From the web form, the download links return GitHub's 404 for about ten minutes, until the files are attached. Claude Code cloud sessions cannot push tags, so this step is the founder's.
 3. getclai.vercel.app needs no change for a new release: `/download/mac`, `/download/mac-intel` and `install.sh` always resolve to the latest release. Update the version shown on the page (`data-version` in apps/site/public/index.html) and, if the panel changed, `panel-light.png` / `panel-dark.png` from the `screenshots` artifact.
 4. Signing: ad hoc until the repository has the Developer ID secrets listed in apps/mac/README.md; then the same workflow signs and notarizes.
 
