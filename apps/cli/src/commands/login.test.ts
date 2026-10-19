@@ -38,7 +38,7 @@ describe('runLogin', () => {
     const fetchImpl = (async (url: string | URL | Request) => {
       const u = String(url);
       if (u.endsWith('/api/auth/device')) {
-        return jsonRes(200, { deviceCode: 'dc1', userCode: 'ABCD-EFGH', verificationUrl: 'https://clai.cobank.ai/#/device?code=ABCD-EFGH', interval: 1, expiresIn: 60 });
+        return jsonRes(200, { deviceCode: 'dc1', userCode: 'ABCD-EFGH', verificationUrl: 'https://clai-cloud.vercel.app/#/device?code=ABCD-EFGH', interval: 1, expiresIn: 60 });
       }
       if (u.endsWith('/api/auth/device/token')) {
         return jsonRes(200, { token: 'clai_mem_x', actorKey: 'jane@acme.com', orgId: 'org_1', role: 'member' });
@@ -50,7 +50,7 @@ describe('runLogin', () => {
     const result = await runLogin({}, ctx, deps, () => {});
 
     expect(result).toEqual({ ok: true, server: HOSTED_URL });
-    expect(opened).toEqual(['https://clai.cobank.ai/#/device?code=ABCD-EFGH']);
+    expect(opened).toEqual(['https://clai-cloud.vercel.app/#/device?code=ABCD-EFGH']);
     expect(readCredentialsFile(ctx.env)['sync']).toEqual({ server: HOSTED_URL, token: 'clai_mem_x' });
     expect(await ctx.store.getSetting('sync.server')).toBe(HOSTED_URL);
   });

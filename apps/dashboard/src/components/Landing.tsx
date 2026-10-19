@@ -29,6 +29,10 @@ const PLANS: { key: string; label: string; usd: number }[] = [
   { key: 'custom', label: 'Another plan', usd: 0 },
 ];
 
+/** The public site (download for Mac) and the source repository. clai is its own product on vercel.app. */
+const SITE_URL = 'https://getclai.vercel.app';
+const SOURCE_URL = 'https://github.com/vcgetter22/clai';
+
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
 function Calculator() {
@@ -87,10 +91,10 @@ export function Landing({ onTokenSubmit, tokenError }: Props) {
     <div className="landing">
       <header className="landing-top">
         <span className="wordmark">clai</span>
-        <span className="muted mono">a cobank.ai product</span>
         <nav className="landing-nav mono">
+          <a href={SITE_URL}>Mac app</a>
           <a href="#pricing">Pricing</a>
-          <a href="https://github.com/vcgetter22/clai" target="_blank" rel="noreferrer">
+          <a href={SOURCE_URL} target="_blank" rel="noreferrer">
             Source
           </a>
           <a href="#signin">Sign in</a>
@@ -111,6 +115,9 @@ export function Landing({ onTokenSubmit, tokenError }: Props) {
         <pre className="landing-commands mono">
           {'npx @claii/cli scan\nnpx @claii/cli plan set anthropic max_5x\nnpx @claii/cli report'}
         </pre>
+        <p className="landing-text">
+          On a Mac, <a href={SITE_URL}>clai for Mac</a> keeps the same figures in the menu bar, updated as your tools write their logs.
+        </p>
       </section>
 
       <section className="landing-section">
@@ -189,8 +196,8 @@ export function Landing({ onTokenSubmit, tokenError }: Props) {
         <a href="/legal/dpa.html">DPA</a>
         <a href="/legal/withdrawal.html">Withdrawal</a>
         <a href="/legal/impressum.html">Impressum</a>
-        <a href="mailto:clai@cobank.ai">clai@cobank.ai</a>
-        <span className="muted">clai, a cobank.ai product</span>
+        <a href={`${SOURCE_URL}/issues`}>Support</a>
+        <a href={SITE_URL}>clai for Mac</a>
       </footer>
     </div>
   );
