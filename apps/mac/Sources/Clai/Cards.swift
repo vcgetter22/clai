@@ -12,7 +12,8 @@ struct StatPills: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            StatPill(title: "Today", value: Format.usd(snapshot.today.usd), detail: "\(Format.usd(snapshot.yesterday.usd)) yesterday")
+            StatPill(title: "Today", value: Format.usd(snapshot.today.usd), detail: snapshot.today.usd > 0 ? "\(Format.usd(snapshot.yesterday.usd)) yesterday" : "nothing on this Mac yet")
+                .help(snapshot.today.usd > 0 ? "Today's usage by the AI tools on this Mac." : "No AI tool on this Mac has logged usage today. Cloud sessions and claude.ai chats leave no logs here.")
             StatPill(title: "7 days", value: Format.usd(snapshot.last7Days.usd), detail: "\(Format.usd(snapshot.last7Days.usd / 7)) a day")
             if let plan = snapshot.plans.first {
                 StatPill(title: "Plan value", value: Format.multiple(plan.multiple), detail: plan.label, accent: true)

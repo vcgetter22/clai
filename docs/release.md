@@ -41,11 +41,14 @@ Regenerate `packages/core/src/pricing/catalog.research.json` from a refreshed `r
 - Quieter look: no bubbles, gloss or glow; SF Pro instead of the rounded font; flat buttons; system-style tabs; the month on a plain ledger-green card; no count-up or rise-in animations; a new icon without bubbles. getclai.vercel.app follows suit.
 - The menu bar shows this month's spend by default, the panel's headline figure. Today and icon-only stay in Settings. With no usage yet today it used to read "$0".
 - Release builds take their version from the `mac-v*` tag.
+- Says what it cannot see: on a day without usage on this Mac the Today pill reads "nothing on this Mac yet"; the month card, the Today pill (on hover) and Settings explain that cloud sessions and claude.ai chats leave no logs on the Mac.
+- Engine (also in npm 0.4.0, which is published from `main` after this merge): Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5 are priced at their own rates (Opus 5.5 was priced as Opus 5); the first scan after a catalog change reprices stored usage.
 
 ## 0.4.0 (all packages, clai for Mac)
 - CLI: `clai snapshot [--scan]`, one JSON document (schema 1) with everything a glanceable surface shows; `clai login` defaults to https://clai-cloud.vercel.app.
 - Server: `computeSnapshot`; local scan results carry `found` and `paths`; `dashboardDistDir()` also honours `CLAI_DASHBOARD_DIR` and a `dashboard/` folder next to a bundled engine; the team server reports its package version.
 - Core: provider and source labels (`providerLabel`, `sourceProvider`).
+- Pricing: Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5 (prompt-length tiers) from the live pricing page, 2026-10-19; the catalog version follows its newest part; `runLocalScan` reprices stored events once per catalog version (`repriceIfCatalogChanged`).
 - Dashboard: the hosted landing page links clai for Mac and GitHub support instead of cobank.ai.
 - Workspace: every package and internal pin at 0.4.0 (fixes `npm ci` on npm 11, which CI's Node 24 job uses).
 - New: clai for Mac 0.4.0 (apps/mac), getclai.vercel.app (apps/site).

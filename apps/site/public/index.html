@@ -144,7 +144,7 @@
         <ul class="ticks">
           <li><b>Reads</b> token counts, model names, timestamps and project folder names.</li>
           <li><b>Never reads</b> your prompts, code or the replies you get.</li>
-          <li><b>Prices</b> with a catalog of 147 models, cache and long-context rules included, labelled API-equivalent.</li>
+          <li><b>Prices</b> with a catalog of 150 models, cache and long-context rules included, labelled API-equivalent.</li>
           <li><b>Talks to the internet</b> only to ask GitHub once a day whether a newer clai exists, and you can turn that off.</li>
         </ul>
       </section>
@@ -180,6 +180,10 @@ npx @claii/cli dashboard</code></pre>
             <summary>The first time you open clai</summary>
             <p>clai is not notarized by Apple yet, so macOS says it cannot check clai for malicious software. Click <b>Done</b>, open <b>System Settings → Privacy &amp; Security</b>, scroll to the message about clai and click <b>Open Anyway</b>, then confirm. macOS remembers the choice.</p>
             <p>The Terminal install above avoids the prompt because files that <code>curl</code> downloads are not marked as coming from the internet.</p>
+          </details>
+          <details>
+            <summary>Does clai count claude.ai and cloud sessions?</summary>
+            <p>No. clai counts the AI tools that run on your Mac and log their usage there: Claude Code, Codex CLI, Gemini CLI, OpenCode, Cline and Aider. Chats on claude.ai and Claude Code sessions that run in Anthropic's cloud, on the web or from the Claude app, leave no logs on your Mac, and Anthropic offers no public usage API for Pro and Max plans, so they do not appear. claude.ai shows your plan's usage limits in its settings.</p>
           </details>
           <details>
             <summary>Apple silicon or Intel?</summary>

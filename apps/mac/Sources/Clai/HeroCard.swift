@@ -46,8 +46,9 @@ struct HeroCard: View {
             RoundedRectangle(cornerRadius: Metrics.heroRadius, style: .continuous)
                 .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         )
+        .help("Usage by the AI tools on this Mac, priced at list prices. Cloud sessions and claude.ai chats leave no logs here and are not included.")
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(snapshot.monthName) so far: \(Format.usd(month.usd)), \(month.basisKind.label). On pace for \(Format.usd(snapshot.forecast.projectedUsd)).")
+        .accessibilityLabel("\(snapshot.monthName) so far on this Mac: \(Format.usd(month.usd)), \(month.basisKind.label). On pace for \(Format.usd(snapshot.forecast.projectedUsd)).")
     }
 
     private var forecastLine: some View {

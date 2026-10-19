@@ -95,7 +95,7 @@ struct SettingsPage: View {
                 Text("The ring on the month card fills as the month’s spend approaches it.")
             }
 
-            Section("General") {
+            Section {
                 Toggle("Open at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
                 Toggle("Check for updates", isOn: $prefs.checkForUpdates)
                     .help("Asks GitHub once a day whether a newer clai for Mac exists. Sends no usage data.")
@@ -103,6 +103,10 @@ struct SettingsPage: View {
                     LabeledContent("Data", value: displayPath(model.dataFolder))
                     Button("Show") { model.revealDataFolder() }
                 }
+            } header: {
+                Text("General")
+            } footer: {
+                Text("clai counts the AI tools that run on this Mac and log their usage here. Chats on claude.ai and Claude Code sessions that run in the cloud leave no logs on this Mac, so they are not included.")
             }
 
             Section("About") {
