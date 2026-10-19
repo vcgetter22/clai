@@ -13,3 +13,6 @@ coverage/
 *.db-wal
 *.db-shm
 .claude/launch.json
+apps/mac/.build/
+apps/mac/build/
+.swiftpm/

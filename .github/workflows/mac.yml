@@ -1,0 +1,133 @@
+name: mac
+# clai for Mac: Swift tests, then the per-architecture app bundles with the bundled engine and
+# Node, a smoke test of the packaged app, and screenshots. A `mac-v*` tag publishes the DMGs and
+# zips as a GitHub release, which getclai.vercel.app/download links to.
+on:
+  push:
+    branches: [main, 'claude/**']
+    tags: ['mac-v*']
+    paths:
+      - 'apps/mac/**'
+      - 'apps/cli/**'
+      - 'apps/server/**'
+      - 'apps/dashboard/**'
+      - 'packages/**'
+      - 'scripts/bundle-engine.mjs'
+      - 'package-lock.json'
+      - '.github/workflows/mac.yml'
+  pull_request:
+    paths:
+      - 'apps/mac/**'
+      - 'apps/cli/**'
+      - 'apps/server/**'
+      - 'packages/**'
+      - 'scripts/bundle-engine.mjs'
+      - '.github/workflows/mac.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      # Signing turns on when the repository has these secrets (see apps/mac/README.md).
+      HAS_SIGNING_CERT: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+          uname -m
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Swift tests (ClaiKit)
+        working-directory: apps/mac
+        run: swift test
+      - name: Import signing certificate
+        if: env.HAS_SIGNING_CERT == 'true'
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p ci "$RUNNER_TEMP/build.keychain"
+          security set-keychain-settings -lut 3600 "$RUNNER_TEMP/build.keychain"
+          security unlock-keychain -p ci "$RUNNER_TEMP/build.keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$RUNNER_TEMP/build.keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci "$RUNNER_TEMP/build.keychain"
+          security list-keychains -d user -s "$RUNNER_TEMP/build.keychain" $(security list-keychains -d user | tr -d '"')
+      - name: Package
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: apps/mac/scripts/package.sh
+      - name: Smoke test (arm64 app)
+        run: ARCH=arm64 apps/mac/scripts/smoke-test.sh
+      - name: Screenshots
+        continue-on-error: true
+        timeout-minutes: 5
+        run: ARCH=arm64 apps/mac/scripts/screenshots.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clai-mac
+          path: apps/mac/build/dist/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: apps/mac/build/screens/
+          if-no-files-found: ignore
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/mac-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: clai-mac
+          path: dist
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#mac-v}"
+          {
+            echo "clai for Mac $VERSION: your AI spend in the menu bar, priced token by token from the logs your tools already keep. Usage data stays on your Mac."
+            echo
+            echo "**Download:** [Apple silicon](https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/clai-mac-arm64.dmg) · [Intel](https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/clai-mac-x64.dmg) · or from https://getclai.vercel.app"
+            echo
+            echo "**First launch.** This build is signed ad hoc, not yet notarized by Apple, so macOS says it cannot check clai for malware. Click Done, open System Settings → Privacy & Security, click **Open Anyway** next to clai and confirm. Or install from Terminal, which skips that prompt:"
+            echo
+            echo '```'
+            echo 'curl -fsSL https://getclai.vercel.app/install.sh | sh'
+            echo '```'
+            echo
+            echo "Requires macOS 14 Sonoma or later. The app includes Node.js 24 LTS to run the clai engine; nothing else to install."
+            echo
+            echo "**SHA-256**"
+            echo
+            echo '```'
+            cat dist/checksums.txt
+            echo '```'
+          } > notes.md
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "clai for Mac $VERSION" --notes-file notes.md --verify-tag
