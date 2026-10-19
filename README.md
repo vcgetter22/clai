@@ -8,7 +8,19 @@
 - **Insights, not just charts.** Plan value, month-end forecast, budget breaches, anomalies, model mix savings, cache efficiency, context bloat, idle seats.
 - **Teams.** Members run `clai sync` to a self-hosted team server (or the hosted service); admins connect the Anthropic, OpenAI, Cursor, Copilot and OpenRouter admin APIs for per-person, per-project and per-key cost.
 
-## Quick start
+## clai for Mac
+
+A menu bar app with today's spend next to the clai tally and a panel with the month so far, the forecast, what your plan is worth, a 30-day chart, where the money went and tips. It runs the same engine as the CLI and refreshes a few seconds after your tools write their logs. Usage data stays on your Mac.
+
+**Download:** https://getclai.vercel.app (Apple silicon and Intel, macOS 14 or later), or from Terminal:
+
+```bash
+curl -fsSL https://getclai.vercel.app/install.sh | sh
+```
+
+Source and build instructions: [apps/mac](apps/mac/README.md).
+
+## Quick start (command line)
 
 ```bash
 npx @claii/cli scan        # detect Claude Code, Codex CLI, Gemini CLI, OpenCode, Cline, Aider and ingest usage
@@ -70,7 +82,7 @@ npm test               # vitest
 npm run clai -- scan   # run the CLI from the repo
 ```
 
-Packages: `packages/core` (types, pricing catalog, cost engine, insights), `packages/store` (SQLite via `node:sqlite`), `packages/connectors` (local logs, provider APIs, data exports), `apps/cli`, `apps/server` (Hono API + team mode), `apps/dashboard` (Vite + React). See `docs/` for the product spec, architecture, connector matrix, market analysis and roadmap.
+Packages: `packages/core` (types, pricing catalog, cost engine, insights), `packages/store` (SQLite via `node:sqlite`), `packages/connectors` (local logs, provider APIs, data exports), `apps/cli`, `apps/server` (Hono API + team mode), `apps/dashboard` (Vite + React), `apps/mac` (SwiftUI menu bar app), `apps/site` (getclai.vercel.app). See `docs/` for the product spec, architecture, connector matrix, market analysis and roadmap.
 
 ## Privacy
 

@@ -23,3 +23,13 @@ clai is an instrument, not a brochure. Its world is ledgers, meters, invoices an
 
 ## What "done" looks like
 A page passes when a finance lead reads a number and knows where it came from, a developer trusts it enough to paste it in a Slack thread, and neither of them can tell which year it was made in.
+
+## clai for Mac and getclai.vercel.app
+Decided 2026-10-19 (docs/decisions.md): the Mac app and its download site look Apple-native with more bubble than the ledger. Rules 1, 3 (figures: tabular, one decimal convention, units), 4, 5, 7, 9 and 10 still apply; rules 2 and 8 are replaced here by:
+
+- **Materials, not paper.** The panel sits on the system material (Liquid Glass on macOS 26, the menu material before). Cards are platters: glass on macOS 26, a 4 to 6 percent fill with a hairline before. Corners are continuous: 24 pt for the hero, 18 for cards, 16 for pills, capsules for buttons and chips.
+- **One green bubble.** The month's figure sits on a ledger-green to mint gradient (`#0E5444`, `#1E7A62`, `#22A386`, `#6FD9B8`; a mesh on macOS 15+) with a white rim highlight and a soft green shadow. White soap bubbles (radial highlight, thin rim) decorate it and nothing else. Ledger green (`#1E7A62`, dark `#4FBE9C`) stays the only accent; provider colours match the dashboard; amber and red still mean warning and critical (a budget ring turns amber on the bubble when the pace would exceed it).
+- **Type.** SF Pro, rounded design for everything in the panel and the site's headings (`ui-rounded` on the web); figures monospaced-digit. Hero figure 40 pt bold; pills 17 pt bold; labels 10.5 to 12.5 pt semibold.
+- **Motion with a purpose, once.** Figures roll to their value when they first appear or change; cards rise in once when the panel first shows numbers; bubbles bloom once and drift a few points with the pointer; buttons swell on hover and squish on press with springs. On the site, background bubbles drift slowly. Reduced motion removes all of it. Nothing pulses to get attention.
+- **Say what leaves the Mac.** The panel footer says "Usage data stays on this Mac"; the only network call is the opt-out daily update check, and settings say so.
+- **Sample data is labelled.** Screenshots and the site's panel image use the engine's sample snapshot and say so; marketing figures beyond that are the founder's real ones with their basis.

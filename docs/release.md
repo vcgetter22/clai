@@ -27,6 +27,20 @@ A formula that wraps `npm install -g @claii/cli` or a Node-bundled tarball; keep
 ## Catalog refresh
 Regenerate `packages/core/src/pricing/catalog.research.json` from a refreshed `research/pricing-catalog.draft.json` with `node scripts/merge-pricing.mjs`, bump `version` in `SEED_CATALOG`, run tests (the catalog integrity test catches alias collisions), and note changes in `docs/decisions.md`. Users pick up the new prices on upgrade and can run `clai pricing reprice`.
 
+## clai for Mac
+1. Bump the workspace version (all packages move together since 0.4.0) and push; `.github/workflows/mac.yml` builds, tests and smoke-tests the app on macos-26 and uploads `clai-mac` and `screenshots` artifacts.
+2. Tag the commit `mac-v<version>` and push the tag; the workflow's release job publishes `clai-mac-arm64.dmg`, `clai-mac-x64.dmg`, the two zips and `checksums.txt` as a GitHub release, which becomes "latest".
+3. getclai.vercel.app needs no change for a new release: `/download/mac`, `/download/mac-intel` and `install.sh` always resolve to the latest release. Update the version shown on the page (`data-version` in apps/site/public/index.html) and, if the panel changed, `panel-light.png` / `panel-dark.png` from the `screenshots` artifact.
+4. Signing: ad hoc until the repository has the Developer ID secrets listed in apps/mac/README.md; then the same workflow signs and notarizes.
+
+## 0.4.0 (all packages, clai for Mac)
+- CLI: `clai snapshot [--scan]`, one JSON document (schema 1) with everything a glanceable surface shows; `clai login` defaults to https://clai-cloud.vercel.app.
+- Server: `computeSnapshot`; local scan results carry `found` and `paths`; `dashboardDistDir()` also honours `CLAI_DASHBOARD_DIR` and a `dashboard/` folder next to a bundled engine; the team server reports its package version.
+- Core: provider and source labels (`providerLabel`, `sourceProvider`).
+- Dashboard: the hosted landing page links clai for Mac and GitHub support instead of cobank.ai.
+- Workspace: every package and internal pin at 0.4.0 (fixes `npm ci` on npm 11, which CI's Node 24 job uses).
+- New: clai for Mac 0.4.0 (apps/mac), getclai.vercel.app (apps/site).
+
 ## 0.3.1 (`@claii/dashboard` only)
 - Hosted landing page: unauthenticated visitors in hosted mode see the landing (hero figure with its basis, plan-value calculator, what clai reads, pricing table, sign-in card, legal footer) instead of a bare sign-in card. Self-hosted team servers and local mode are unchanged.
 

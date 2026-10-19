@@ -10,16 +10,20 @@
 - Publish `@claii/cli`, `@claii/server`, `@claii/dashboard` to npm; Homebrew tap; Dockerfile and compose for the team server.
 - Real-data validation runs against Anthropic and OpenAI admin orgs, Cursor and Copilot orgs (fixture tests exist; live shapes to confirm).
 - Claude Code OTLP receiver in the team server (metrics + api_request events) for organizations that prefer telemetry over sync.
-- `clai watch` (tail logs live) and a statusline/menu-bar mode; VS Code status bar extension.
+- `clai watch` (tail logs live) and a statusline mode; VS Code status bar extension. Menu bar: done as clai for Mac (0.4.0, see below).
 - Landing page with the no-login "what is your Max plan worth" calculator; Product Hunt and Show HN.
 
-## v0.3 (Plus tier, 4-8 weeks)
+## 0.4.0, shipped 2026-10-19: clai for Mac
+- SwiftUI menu bar app over the same engine (`clai snapshot`), live refresh from the tools' log folders, plans and budget in settings, Liquid Glass on macOS 26; downloads and `install.sh` on getclai.vercel.app.
+- Next for the app: Developer ID signing and notarization (needs the founder's Apple Developer account), a Homebrew cask, in-app updates (Sparkle), notifications for budget breaches and spikes, a desktop widget reading the same snapshot.
+
+## Next: Plus tier (hosted, 4-8 weeks)
 - Hosted service: Postgres adapter behind EventStore, org/user accounts (magic link), Stripe billing (Plus $7, Team $5/seat), EU and US regions.
 - Alerts: budget breach, anomaly, plan value, approaching weekly limits (from Codex rate-limit snapshots and Claude Code usage data), via email and Slack.
 - Browser extension (opt-in, disclosed) for claude.ai / chatgpt.com remaining-limit widgets.
 - FOCUS 1.4 export with token columns; CSV chargeback report per project/client.
 
-## v0.4 (Team depth)
+## Then: Team depth
 - Bedrock (Cost Explorer + CloudWatch), Azure OpenAI (Cost Management + Monitor), Vertex/BigQuery billing export, Microsoft 365 Copilot and Google Workspace Gemini adoption reports, Windsurf/Codeium analytics, LiteLLM/Helicone/Portkey/Cloudflare gateway imports.
 - SSO (SAML/OIDC) and SCIM, audit log, per-team budgets and Slack digests, cost-per-PR and cost-per-engineer benchmarks.
 - Shadow-AI discovery from expense exports (Ramp/Brex CSV) matched against known AI vendors.
