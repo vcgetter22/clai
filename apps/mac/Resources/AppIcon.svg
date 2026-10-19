@@ -1,54 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- clai for Mac app icon: the tally on a ledger-green bubble. Rendered to AppIcon.png by scripts/render-icon.mjs. -->
+  <!-- clai for Mac app icon: the tally on a ledger-green squircle. Rendered to AppIcon.png by scripts/render-icon.mjs. -->
   <defs>
-    <linearGradient id="ground" x1="0.1" y1="1" x2="0.9" y2="0">
-      <stop offset="0" stop-color="#083F33"/>
-      <stop offset="0.42" stop-color="#1E7A62"/>
-      <stop offset="0.78" stop-color="#26A98A"/>
-      <stop offset="1" stop-color="#86E6C6"/>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#23866C"/>
+      <stop offset="1" stop-color="#0E5444"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0.74" cy="0.18" r="0.7">
-      <stop offset="0" stop-color="#D8FAEC" stop-opacity="0.85"/>
-      <stop offset="0.55" stop-color="#9BEBD0" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="#9BEBD0" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="bubble" cx="0.34" cy="0.28" r="0.78">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.8"/>
-      <stop offset="0.28" stop-color="#FFFFFF" stop-opacity="0.2"/>
-      <stop offset="0.82" stop-color="#FFFFFF" stop-opacity="0.05"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.38"/>
-    </radialGradient>
     <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.7"/>
-      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0.06"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.22"/>
-    </linearGradient>
-    <linearGradient id="mark" gradientUnits="userSpaceOnUse" x1="0" y1="330" x2="0" y2="700">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#E2FBF1"/>
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.3"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.12"/>
     </linearGradient>
     <filter id="drop" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="14" stdDeviation="15" flood-color="#000000" flood-opacity="0.3"/>
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.28"/>
     </filter>
     <filter id="markShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#04372B" flood-opacity="0.5"/>
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#032A21" flood-opacity="0.35"/>
     </filter>
-    <clipPath id="squircle">
-      <rect x="100" y="100" width="824" height="824" rx="185.4"/>
-    </clipPath>
   </defs>
 
   <rect x="100" y="100" width="824" height="824" rx="185.4" fill="url(#ground)" filter="url(#drop)"/>
-  <g clip-path="url(#squircle)">
-    <rect x="100" y="100" width="824" height="824" fill="url(#glow)"/>
-    <circle cx="760" cy="770" r="205" fill="url(#bubble)" stroke="#FFFFFF" stroke-opacity="0.34" stroke-width="5"/>
-    <circle cx="286" cy="262" r="66" fill="url(#bubble)" stroke="#FFFFFF" stroke-opacity="0.38" stroke-width="3.5"/>
-    <circle cx="856" cy="318" r="40" fill="url(#bubble)" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="3"/>
-    <circle cx="210" cy="800" r="30" fill="url(#bubble)" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="2.5"/>
-    <circle cx="420" cy="860" r="15" fill="url(#bubble)" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2"/>
-  </g>
 
-  <g filter="url(#markShadow)" stroke="url(#mark)" stroke-linecap="round" stroke-width="58" fill="none">
+  <g filter="url(#markShadow)" stroke="#FFFFFF" stroke-linecap="round" stroke-width="58" fill="none">
     <line x1="362" y1="338" x2="362" y2="690"/>
     <line x1="462" y1="338" x2="462" y2="690"/>
     <line x1="562" y1="338" x2="562" y2="690"/>
@@ -56,5 +28,5 @@
     <line x1="292" y1="628" x2="732" y2="400"/>
   </g>
 
-  <rect x="103" y="103" width="818" height="818" rx="182.4" fill="none" stroke="url(#rim)" stroke-width="6"/>
+  <rect x="103" y="103" width="818" height="818" rx="182.4" fill="none" stroke="url(#rim)" stroke-width="5"/>
 </svg>

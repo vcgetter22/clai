@@ -17,7 +17,7 @@ struct ClaiApp: App {
     }
 }
 
-/// The menu bar item: the tally and, by default, today's spend.
+/// The menu bar item: the tally and, by default, this month's spend so far.
 struct MenuBarLabel: View {
     let model: AppModel
 

@@ -39,17 +39,17 @@ struct StatPill: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.system(size: isAction ? 15 : 17, weight: .bold, design: .rounded))
+                .font(.system(size: isAction ? 15 : 17, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(accent ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.primary))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .contentTransition(.numericText())
             Text(detail)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -58,15 +58,15 @@ struct StatPill: View {
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
         .platter(cornerRadius: 16)
-        .scaleEffect(isAction && hovering ? 1.03 : 1)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: hovering)
+        .opacity(isAction && hovering ? 0.8 : 1)
+        .animation(.easeOut(duration: 0.12), value: hovering)
         .onHover { hovering = isAction && $0 }
     }
 }
 
 // MARK: - Daily chart
 
-/// Thirty days of spend, one bar a day, today in the bubble gradient. Hover reads a day out.
+/// Thirty days of spend, one bar a day, today at full strength. Hover reads a day out.
 struct DailyChartCard: View {
     let snapshot: Snapshot
     @State private var selected: Date?
@@ -113,14 +113,14 @@ struct DailyChartCard: View {
         return Chart(bars) { bar in
             BarMark(x: .value("Day", bar.date, unit: .day), y: .value("Spend", bar.usd), width: .ratio(0.64))
                 .foregroundStyle(style(for: bar, highlighted: highlighted))
-                .cornerRadius(3)
+                .cornerRadius(2)
         }
         .chartYScale(domain: 0...max(1, peak * 1.12))
         .chartXSelection(value: $selected)
         .chartXAxis {
             AxisMarks(values: ticks) { _ in
                 AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .font(.system(size: 9, weight: .medium))
             }
         }
         .chartYAxis {
@@ -130,7 +130,7 @@ struct DailyChartCard: View {
                 AxisValueLabel {
                     if let amount = value.as(Double.self) {
                         Text(Format.axisUsd(amount))
-                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                            .font(.system(size: 9, weight: .medium))
                     }
                 }
             }
@@ -140,8 +140,8 @@ struct DailyChartCard: View {
     }
 
     private func style(for bar: Bar, highlighted: String?) -> AnyShapeStyle {
-        if bar.isToday || bar.id == highlighted { return AnyShapeStyle(Theme.barGradient) }
-        return AnyShapeStyle(Theme.accent.opacity(highlighted == nil ? 0.55 : 0.32))
+        if bar.isToday || bar.id == highlighted { return AnyShapeStyle(Theme.accent) }
+        return AnyShapeStyle(Theme.accent.opacity(highlighted == nil ? 0.45 : 0.28))
     }
 }
 
@@ -155,7 +155,7 @@ struct BreakdownCard: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 10) {
-            BubbleTabs(tabs: BreakdownTab.allCases, selection: $model.breakdown, title: title)
+            SegmentedTabs(tabs: BreakdownTab.allCases, selection: $model.breakdown, title: title)
             content
         }
         .padding(12)
@@ -203,15 +203,15 @@ struct SliceRow: View {
             HStack(spacing: 8) {
                 ProviderDot(color: color, size: 9)
                 Text(slice.label)
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                    .font(.system(size: 12.5, weight: .medium))
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 6)
                 Text(Format.usd(slice.usd))
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    .font(.system(size: 12.5, weight: .semibold))
                     .monospacedDigit()
                 Text(Format.percent(slice.share))
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.system(size: 11, weight: .medium))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .frame(width: 34, alignment: .trailing)
@@ -237,7 +237,7 @@ struct InsightList: View {
                 }
                 Button("All insights in the dashboard") { model.openDashboard(page: "insights") }
                     .buttonStyle(.link)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.system(size: 11, weight: .medium))
             }
         }
     }
@@ -255,12 +255,12 @@ struct InsightRow: View {
                 .background(Circle().fill(Theme.severity(insight.level).opacity(0.14)))
             VStack(alignment: .leading, spacing: 2) {
                 Text(insight.title)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(size: 12, weight: .semibold))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 if let impact = insight.impactUsdPerMonth, impact > 0 {
                     Text("About \(Format.usd(impact)) a month")
-                        .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                        .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(Theme.accent)
                 }
             }
@@ -275,7 +275,7 @@ struct EmptyRow: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .regular, design: .rounded))
+            .font(.system(size: 12, weight: .regular))
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 6)

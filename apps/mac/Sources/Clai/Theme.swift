@@ -2,7 +2,7 @@ import AppKit
 import ClaiKit
 import SwiftUI
 
-/// clai for Mac's look: Apple-native materials and type, with bubbles. The ledger green from
+/// clai for Mac's look: Apple-native materials and type, quiet surfaces. The ledger green from
 /// docs/design-principles.md stays the one accent; provider colours match the dashboard.
 enum Theme {
     static let accent = dynamic(light: 0x1E7A62, dark: 0x4FBE9C)
@@ -11,27 +11,21 @@ enum Theme {
     static let critical = dynamic(light: 0xA83A3A, dark: 0xE06C6C)
     static let info = dynamic(light: 0x4A5FA8, dark: 0x8FA3E0)
 
-    /// Deep ledger green through teal to mint: the hero bubble, today's bar, the icon.
-    static let deep = Color(hex: 0x0E5444)
+    /// Ledger green and its deeper shade: the month card, the logo and the prominent button.
     static let green = Color(hex: 0x1E7A62)
-    static let teal = Color(hex: 0x22A386)
-    static let mint = Color(hex: 0x6FD9B8)
-    static let foam = Color(hex: 0xC9F5E4)
-    /// Highlight for a budget that is on pace to be exceeded, readable on the green bubble.
+    static let deep = Color(hex: 0x0E5444)
+    /// Highlight for a budget that is on pace to be exceeded, readable on the green card.
     static let amberOnGreen = Color(hex: 0xFFD27A)
 
-    static var heroGradient: LinearGradient {
-        LinearGradient(colors: [deep, green, teal, mint], startPoint: .bottomLeading, endPoint: .topTrailing)
+    /// The month card: ledger green settling into the deeper shade, white text above 5:1.
+    static var heroFill: LinearGradient {
+        LinearGradient(colors: [green, deep], startPoint: .top, endPoint: .bottom)
     }
 
-    static var barGradient: LinearGradient {
-        LinearGradient(colors: [mint, teal], startPoint: .top, endPoint: .bottom)
-    }
-
-    /// Ledger green to deep green, so white button text stays above 5:1 contrast.
-    static var buttonGradient: LinearGradient {
-        LinearGradient(colors: [green, Color(hex: 0x155C4A)], startPoint: .top, endPoint: .bottom)
-    }
+    /// The prominent button at rest, under the pointer and pressed (white text 5.2:1 and up).
+    static let buttonFill = green
+    static let buttonHover = Color(hex: 0x1A6B56)
+    static let buttonPressed = Color(hex: 0x155C4A)
 
     static func provider(_ key: String?) -> Color {
         switch key {
@@ -67,7 +61,7 @@ enum Metrics {
     static let panelWidth: CGFloat = 368
     static let gutter: CGFloat = 12
     static let cardRadius: CGFloat = 18
-    static let heroRadius: CGFloat = 24
+    static let heroRadius: CGFloat = 18
 }
 
 extension Color {

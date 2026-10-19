@@ -6,7 +6,7 @@ It is a native SwiftUI app (`MenuBarExtra`, macOS 14 Sonoma or later; Liquid Gla
 
 ## Layout
 - `Sources/ClaiKit`: Foundation only. The snapshot model (schema 1, mirrors `apps/server/src/snapshot.ts`), number formatting identical to `@claii/core`, the process runner, the engine wrapper, Mach-O architecture checks, release-version parsing. Tests run on macOS and Linux.
-- `Sources/Clai`: the app. `AppModel` (refresh, live updates, actions), `Services` (preferences, FSEvents log watcher, login item, local dashboard launcher, menu bar icon), and the views (`PanelView`, `HeroBubble`, `Cards`, `SettingsView`, `Components`, `Theme`).
+- `Sources/Clai`: the app. `AppModel` (refresh, live updates, actions), `Services` (preferences, FSEvents log watcher, login item, local dashboard launcher, menu bar icon), and the views (`PanelView`, `HeroCard`, `Cards`, `SettingsView`, `Components`, `Theme`).
 - `Tests/ClaiKitTests/Fixtures/snapshot.json`: written by `apps/server/src/snapshot.test.ts` from the real engine; the Swift tests decode it, so a shape change on either side fails a test. It is also the app's sample data (`--demo`).
 - `scripts/package.sh`, `scripts/smoke-test.sh`, `scripts/screenshots.sh`, `scripts/render-icon.mjs`; `Info.plist`; `Resources/AppIcon.svg` and `.png`.
 
@@ -28,6 +28,6 @@ ARCH=arm64 apps/mac/scripts/smoke-test.sh
 `package.sh` builds a universal Swift binary, then one app per architecture with that architecture's Node (downloaded from nodejs.org and checked against SHASUMS256.txt; its notarized Node.js signature is kept). It signs ad hoc unless `MACOS_SIGNING_IDENTITY` names a Developer ID Application identity in the keychain, and notarizes when `APPLE_ID`, `APPLE_TEAM_ID` and `APPLE_APP_PASSWORD` are also set.
 
 ## Release
-`.github/workflows/mac.yml` runs on pushes that touch the app or the engine: npm build, `swift test`, `package.sh`, the smoke test, screenshots (uploaded as artifacts). Pushing a tag `mac-v<version>` (the version in `apps/cli/package.json`) also publishes a GitHub release with the DMGs, zips and checksums. getclai.vercel.app redirects `/download/mac` and `/download/mac-intel` to the latest release, and its `install.sh` installs from it.
+`.github/workflows/mac.yml` runs on pushes that touch the app or the engine: npm build, `swift test`, `package.sh`, the smoke test, screenshots (uploaded as artifacts). Pushing a tag `mac-v<version>` builds the app with that version and publishes a GitHub release with the DMGs, zips and checksums. getclai.vercel.app redirects `/download/mac` and `/download/mac-intel` to the latest release, and its `install.sh` installs from it.
 
 To ship notarized builds, add these repository secrets: `MACOS_CERTIFICATE_P12` (base64 of the exported Developer ID Application certificate and key), `MACOS_CERTIFICATE_PASSWORD`, `MACOS_SIGNING_IDENTITY` (e.g. `Developer ID Application: Name (TEAMID)`), `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` (an app-specific password). Until then users confirm the first launch once in System Settings → Privacy & Security, or install with `curl -fsSL https://getclai.vercel.app/install.sh | sh`.

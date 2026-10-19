@@ -92,7 +92,7 @@ struct SettingsPage: View {
             } header: {
                 Text("Monthly budget")
             } footer: {
-                Text("The ring in the green bubble fills as the month's spend approaches it.")
+                Text("The ring on the month card fills as the month’s spend approaches it.")
             }
 
             Section("General") {

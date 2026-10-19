@@ -33,9 +33,11 @@ enum MenuBarIcon {
 
 // MARK: - Preferences
 
+/// The figure next to the tally. The month by default: the panel's headline, and never a bare $0
+/// on a morning without usage yet.
 enum MenuBarDisplay: String, CaseIterable, Identifiable {
-    case today
     case month
+    case today
     case iconOnly
 
     var id: String { rawValue }
@@ -84,7 +86,7 @@ final class Preferences {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        menuBarDisplay = MenuBarDisplay(rawValue: defaults.string(forKey: Key.display) ?? "") ?? .today
+        menuBarDisplay = MenuBarDisplay(rawValue: defaults.string(forKey: Key.display) ?? "") ?? .month
         let minutes = defaults.integer(forKey: Key.refresh)
         refreshMinutes = Preferences.refreshChoices.contains(minutes) ? minutes : 5
         liveUpdates = defaults.object(forKey: Key.live) as? Bool ?? true

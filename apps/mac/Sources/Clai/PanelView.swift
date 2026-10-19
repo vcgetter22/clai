@@ -20,10 +20,9 @@ struct PanelView: View {
                         .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .move(edge: .trailing).combined(with: .opacity)))
                 }
             }
-            .animation(reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.86), value: model.page)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: model.page)
         }
         .frame(width: Metrics.panelWidth)
-        .fontDesign(.rounded)
         .onAppear { model.panelOpened() }
     }
 }
@@ -37,14 +36,14 @@ struct PanelHeader: View {
         HStack(spacing: 8) {
             if model.page == .settings {
                 Button { model.page = .overview } label: { Image(systemName: "chevron.left") }
-                    .buttonStyle(BubbleIconButtonStyle())
+                    .buttonStyle(IconButtonStyle())
                     .help("Back")
                 Text("Settings")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 15, weight: .semibold))
             } else {
-                LogoBubble()
+                LogoMark()
                 Text("clai")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                    .font(.system(size: 15, weight: .bold))
                 if model.isDemo { Chip(text: "Sample data") }
             }
             Spacer()
@@ -60,11 +59,11 @@ struct PanelHeader: View {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
-                .buttonStyle(BubbleIconButtonStyle())
+                .buttonStyle(IconButtonStyle())
                 .disabled(model.isRefreshing || model.isDemo)
                 .help("Scan now")
                 Button { model.page = .settings } label: { Image(systemName: "gearshape.fill") }
-                    .buttonStyle(BubbleIconButtonStyle())
+                    .buttonStyle(IconButtonStyle())
                     .help("Settings")
             }
         }
@@ -80,9 +79,8 @@ struct LiveBadge: View {
             Circle()
                 .fill(Theme.accent)
                 .frame(width: 6, height: 6)
-                .shadow(color: Theme.accent.opacity(0.8), radius: 3)
             Text("Live")
-                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(Theme.accent)
         }
         .padding(.horizontal, 7)
@@ -120,8 +118,6 @@ struct OverviewPage: View {
 struct OverviewContent: View {
     let snapshot: Snapshot
     @Environment(AppModel.self) private var model
-    @State private var appeared = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 8) {
@@ -130,35 +126,11 @@ struct OverviewContent: View {
             } else if let stale = model.staleReason {
                 NoticeView(text: "Showing the last good numbers. \(stale)", tint: Theme.warning, onDismiss: nil)
             }
-            HeroBubble(snapshot: snapshot)
-                .modifier(Rise(index: 0, appeared: appeared))
+            HeroCard(snapshot: snapshot)
             StatPills(snapshot: snapshot) { model.page = .settings }
-                .modifier(Rise(index: 1, appeared: appeared))
             DailyChartCard(snapshot: snapshot)
-                .modifier(Rise(index: 2, appeared: appeared))
             BreakdownCard(snapshot: snapshot)
-                .modifier(Rise(index: 3, appeared: appeared))
         }
-        .onAppear {
-            if reduceMotion { appeared = true } else { withAnimation { appeared = true } }
-        }
-    }
-}
-
-/// Cards rise into place once, one after another, when the panel first shows numbers.
-struct Rise: ViewModifier {
-    let index: Int
-    let appeared: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.exportRendering) private var exporting
-
-    func body(content: Content) -> some View {
-        let appeared = self.appeared || exporting
-        return content
-            .opacity(appeared ? 1 : 0)
-            .offset(y: appeared || reduceMotion ? 0 : 10)
-            .scaleEffect(appeared || reduceMotion ? 1 : 0.97, anchor: .top)
-            .animation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.78).delay(Double(index) * 0.045), value: appeared)
     }
 }
 
@@ -169,15 +141,15 @@ struct NoticeView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "exclamationmark.bubble.fill")
+            Image(systemName: "exclamationmark.circle.fill")
                 .foregroundStyle(tint)
             Text(text)
-                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                .font(.system(size: 11.5, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             if let onDismiss {
                 Button(action: onDismiss) { Image(systemName: "xmark") }
-                    .buttonStyle(BubbleIconButtonStyle())
+                    .buttonStyle(IconButtonStyle())
                     .controlSize(.small)
             }
         }
@@ -196,19 +168,17 @@ struct WelcomeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Hi, I'm clai.")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                Text("Welcome to clai")
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.white)
-                Text("I read the token counts your AI tools already write on this Mac and price them at list price, so you can see what your usage costs and what your plan is worth.")
-                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                Text("clai reads the token counts your AI tools already write on this Mac and prices them at list rates, so you can see what your usage costs and what your plan is worth.")
+                    .font(.system(size: 12.5))
                     .foregroundStyle(.white.opacity(0.9))
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(ZStack { HeroGradient(); BubbleField(bloom: true, pointer: .zero) })
-            .clipShape(RoundedRectangle(cornerRadius: Metrics.heroRadius, style: .continuous))
-            .shadow(color: Theme.green.opacity(0.3), radius: 12, y: 6)
+            .background(Theme.heroFill, in: RoundedRectangle(cornerRadius: Metrics.heroRadius, style: .continuous))
 
             VStack(alignment: .leading, spacing: 8) {
                 SectionTitle(text: "Tools on this Mac")
@@ -217,9 +187,9 @@ struct WelcomeView: View {
                         Image(systemName: source.found ? "checkmark.circle.fill" : "circle.dashed")
                             .foregroundStyle(source.found ? Theme.accent : Color.secondary)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(source.label).font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                            Text(source.label).font(.system(size: 12.5, weight: .semibold))
                             Text(source.found ? source.summary : "Not found")
-                                .font(.system(size: 10.5, design: .rounded))
+                                .font(.system(size: 10.5))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)
                                 .truncationMode(.middle)
@@ -229,7 +199,7 @@ struct WelcomeView: View {
                 Text(snapshot.foundSources.isEmpty
                      ? "Nothing to read yet. Use Claude Code, Codex CLI, Gemini CLI, OpenCode, Cline or Aider and clai picks it up on its own."
                      : "Found the logs but no usage in them yet. New sessions show up here within seconds.")
-                    .font(.system(size: 11.5, design: .rounded))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
@@ -239,7 +209,7 @@ struct WelcomeView: View {
 
             HStack {
                 Button("Scan again") { Task { await model.refresh() } }
-                    .buttonStyle(BubbleProminentButtonStyle())
+                    .buttonStyle(ProminentButtonStyle())
                     .disabled(model.isRefreshing)
                 Spacer()
             }
@@ -248,33 +218,22 @@ struct WelcomeView: View {
 }
 
 struct LoadingView: View {
-    @State private var phase = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 7) {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .fill(Theme.heroGradient)
-                        .frame(width: 12, height: 12)
-                        .offset(y: phase && !reduceMotion ? -7 : 0)
-                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.45).repeatForever(autoreverses: true).delay(Double(index) * 0.15), value: phase)
-                }
-            }
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.regular)
             Text("Reading your logs…")
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(.system(size: 13.5, weight: .semibold))
             Text("The first scan of a busy machine can take a minute. After that clai only reads what is new.")
-                .font(.system(size: 11.5, design: .rounded))
+                .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        .padding(.vertical, 36)
         .padding(.horizontal, 24)
         .platter()
-        .onAppear { phase = true }
     }
 }
 
@@ -285,20 +244,20 @@ struct ProblemView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("clai could not read your usage", systemImage: "exclamationmark.triangle.fill")
-                .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                .font(.system(size: 13.5, weight: .semibold))
                 .foregroundStyle(Theme.warning)
             Text(message)
-                .font(.system(size: 12, design: .rounded))
+                .font(.system(size: 12))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 Button("Try again") { Task { await model.refresh() } }
-                    .buttonStyle(BubbleProminentButtonStyle())
+                    .buttonStyle(ProminentButtonStyle())
                 Button("Copy details") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString("clai for Mac \(model.appVersion): \(message)", forType: .string)
                 }
-                .buttonStyle(BubbleCapsuleButtonStyle())
+                .buttonStyle(SecondaryButtonStyle())
             }
         }
         .padding(14)
@@ -328,16 +287,16 @@ struct PanelFooter: View {
             VStack(alignment: .leading, spacing: 2) {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     Text(statusLine(now: context.date))
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
                 if let update = model.availableUpdate {
                     Link("Version \(update.version.description) is out", destination: URL(string: "https://getclai.vercel.app")!)
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .font(.system(size: 10.5, weight: .semibold))
                 } else {
                     Label("Usage data stays on this Mac", systemImage: "lock.fill")
-                        .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                        .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(.tertiary)
                         .labelStyle(.titleAndIcon)
                         .lineLimit(1)
@@ -348,7 +307,7 @@ struct PanelFooter: View {
             Button { model.openDashboard() } label: {
                 Label("Dashboard", systemImage: "chart.bar.xaxis")
             }
-            .buttonStyle(BubbleProminentButtonStyle())
+            .buttonStyle(ProminentButtonStyle())
             .help("Open the full dashboard in your browser (served from this Mac at 127.0.0.1)")
             if exporting {
                 MoreGlyph()

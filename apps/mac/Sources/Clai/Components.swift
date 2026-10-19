@@ -4,99 +4,88 @@ import SwiftUI
 
 // MARK: - Buttons
 
-/// Round icon button that swells a little on hover and squishes when pressed.
-struct BubbleIconButtonStyle: ButtonStyle {
+/// Round icon button for the header and notices: a quiet fill that deepens under the pointer.
+struct IconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        BubbleIconButtonBody(configuration: configuration)
+        IconButtonBody(configuration: configuration)
     }
 }
 
-private struct BubbleIconButtonBody: View {
+private struct IconButtonBody: View {
     let configuration: ButtonStyleConfiguration
     @State private var hovering = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         configuration.label
             .font(.system(size: 12.5, weight: .semibold))
             .foregroundStyle(hovering ? Color.primary : Color.secondary)
             .frame(width: 28, height: 28)
-            .background(Circle().fill(Color.primary.opacity(configuration.isPressed ? 0.16 : hovering ? 0.1 : 0.055)))
+            .background(Circle().fill(Color.primary.opacity(configuration.isPressed ? 0.15 : hovering ? 0.09 : 0.05)))
             .contentShape(Circle())
-            .scaleEffect(reduceMotion ? 1 : configuration.isPressed ? 0.88 : hovering ? 1.07 : 1)
-            .animation(.spring(response: 0.28, dampingFraction: 0.55), value: hovering)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: hovering)
             .onHover { hovering = $0 }
     }
 }
 
-/// The one prominent action: a glossy green capsule.
-struct BubbleProminentButtonStyle: ButtonStyle {
+/// The one prominent action in a view: a flat ledger-green capsule.
+struct ProminentButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        BubbleProminentBody(configuration: configuration)
+        ProminentButtonBody(configuration: configuration)
     }
 }
 
-private struct BubbleProminentBody: View {
+private struct ProminentButtonBody: View {
     let configuration: ButtonStyleConfiguration
     @State private var hovering = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         configuration.label
-            .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+            .font(.system(size: 12.5, weight: .semibold))
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
-            .frame(height: 30)
-            .background(
-                Capsule()
-                    .fill(Theme.buttonGradient)
-                    .overlay(Capsule().fill(LinearGradient(colors: [.white.opacity(0.32), .white.opacity(0)], startPoint: .top, endPoint: .center)).padding(1))
-                    .overlay(Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
-            )
-            .shadow(color: Theme.green.opacity(hovering ? 0.45 : 0.28), radius: hovering ? 9 : 5, y: hovering ? 4 : 2)
+            .frame(height: 28)
+            .background(Capsule().fill(configuration.isPressed ? Theme.buttonPressed : hovering ? Theme.buttonHover : Theme.buttonFill))
             .opacity(isEnabled ? 1 : 0.5)
             .contentShape(Capsule())
-            .scaleEffect(reduceMotion ? 1 : configuration.isPressed ? 0.94 : hovering ? 1.03 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: hovering)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: hovering)
             .onHover { hovering = $0 }
     }
 }
 
 /// Quiet capsule button for secondary actions.
-struct BubbleCapsuleButtonStyle: ButtonStyle {
+struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        BubbleCapsuleBody(configuration: configuration)
+        SecondaryButtonBody(configuration: configuration)
     }
 }
 
-private struct BubbleCapsuleBody: View {
+private struct SecondaryButtonBody: View {
     let configuration: ButtonStyleConfiguration
     @State private var hovering = false
 
     var body: some View {
         configuration.label
-            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .font(.system(size: 12, weight: .medium))
             .padding(.horizontal, 12)
             .frame(height: 28)
             .background(Capsule().fill(Color.primary.opacity(configuration.isPressed ? 0.14 : hovering ? 0.09 : 0.06)))
             .contentShape(Capsule())
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.65), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: hovering)
             .onHover { hovering = $0 }
     }
 }
 
 // MARK: - Tabs
 
-/// A segmented control whose selection is a green bubble that slides between tabs.
-struct BubbleTabs<Tab: Hashable & Identifiable>: View {
+/// A segmented control drawn by hand (so it renders the same offscreen): the selected tab sits
+/// on a raised capsule, as in the system control.
+struct SegmentedTabs<Tab: Hashable & Identifiable>: View {
     let tabs: [Tab]
     @Binding var selection: Tab
     let title: (Tab) -> String
     @Namespace private var namespace
+    @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -104,24 +93,19 @@ struct BubbleTabs<Tab: Hashable & Identifiable>: View {
             ForEach(tabs) { tab in
                 let selected = tab == selection
                 Button {
-                    if reduceMotion {
-                        selection = tab
-                    } else {
-                        withAnimation(.spring(response: 0.34, dampingFraction: 0.74)) { selection = tab }
-                    }
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { selection = tab }
                 } label: {
                     Text(title(tab))
-                        .font(.system(size: 12, weight: selected ? .bold : .medium, design: .rounded))
-                        .foregroundStyle(selected ? Color.white : Color.secondary)
+                        .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                        .foregroundStyle(selected ? Color.primary : Color.secondary)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 26)
+                        .frame(height: 24)
                         .background {
                             if selected {
                                 Capsule()
-                                    .fill(Theme.buttonGradient)
-                                    .overlay(Capsule().fill(LinearGradient(colors: [.white.opacity(0.32), .white.opacity(0)], startPoint: .top, endPoint: .center)).padding(1))
-                                    .shadow(color: Theme.green.opacity(0.35), radius: 4, y: 2)
+                                    .fill(scheme == .dark ? Color.white.opacity(0.16) : Color.white)
+                                    .shadow(color: .black.opacity(scheme == .dark ? 0.25 : 0.12), radius: 1, y: 0.5)
                                     .matchedGeometryEffect(id: "selection", in: namespace)
                             }
                         }
@@ -131,7 +115,7 @@ struct BubbleTabs<Tab: Hashable & Identifiable>: View {
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
-        .padding(3)
+        .padding(2)
         .background(Capsule().fill(Color.primary.opacity(0.06)))
     }
 }
@@ -142,44 +126,37 @@ struct BubbleTabs<Tab: Hashable & Identifiable>: View {
 struct Chip: View {
     let text: String
     var systemImage: String?
-    var onBubble = false
+    var onCard = false
 
     var body: some View {
         HStack(spacing: 3) {
             if let systemImage { Image(systemName: systemImage).font(.system(size: 8.5, weight: .bold)) }
             Text(text)
         }
-        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+        .font(.system(size: 10.5, weight: .medium))
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
-        .foregroundStyle(onBubble ? Color.white : Color.secondary)
-        .background(Capsule().fill(onBubble ? Color.white.opacity(0.2) : Color.primary.opacity(0.07)))
-        .overlay(Capsule().strokeBorder(onBubble ? Color.white.opacity(0.28) : Color.clear, lineWidth: 0.5))
+        .foregroundStyle(onCard ? Color.white : Color.secondary)
+        .background(Capsule().fill(onCard ? Color.white.opacity(0.16) : Color.primary.opacity(0.07)))
     }
 }
 
-/// A glossy dot in a provider's colour.
+/// A dot in a provider's colour.
 struct ProviderDot: View {
     let color: Color
     var size: CGFloat = 10
 
     var body: some View {
         Circle()
-            .fill(color.gradient)
-            .overlay(Circle().fill(RadialGradient(colors: [.white.opacity(0.55), .white.opacity(0)], center: UnitPoint(x: 0.32, y: 0.28), startRadius: 0, endRadius: size * 0.55)))
+            .fill(color)
             .frame(width: size, height: size)
     }
 }
 
-/// A share of the whole as a rounded bar.
+/// A share of the whole as a thin bar.
 struct ShareBar: View {
     let share: Double
     let color: Color
-    @State private var appeared = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.exportRendering) private var exporting
-
-    private var shown: Bool { appeared || exporting }
 
     var body: some View {
         GeometryReader { geometry in
@@ -187,14 +164,12 @@ struct ShareBar: View {
                 .fill(color.opacity(0.14))
                 .overlay(alignment: .leading) {
                     Capsule()
-                        .fill(color.gradient)
-                        .frame(width: max(4, geometry.size.width * min(1, max(0, shown ? share : 0))))
+                        .fill(color)
+                        .frame(width: max(4, geometry.size.width * min(1, max(0, share))))
                 }
         }
         .frame(height: 4)
-        .onAppear {
-            if reduceMotion { appeared = true } else { withAnimation(.spring(response: 0.7, dampingFraction: 0.8).delay(0.1)) { appeared = true } }
-        }
+        .animation(.easeOut(duration: 0.3), value: share)
     }
 }
 
@@ -205,12 +180,12 @@ struct SectionTitle: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(text)
-                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(.secondary)
             Spacer()
             if let trailing {
                 Text(trailing)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.system(size: 11, weight: .regular))
                     .monospacedDigit()
                     .foregroundStyle(.tertiary)
             }
@@ -218,14 +193,13 @@ struct SectionTitle: View {
     }
 }
 
-/// The tally mark in a green bubble: the app's logo in the panel header.
-struct LogoBubble: View {
+/// The app's logo in the panel header: the tally on a ledger-green squircle, like the icon.
+struct LogoMark: View {
     var size: CGFloat = 22
 
     var body: some View {
         ZStack {
-            Circle().fill(Theme.heroGradient)
-            Circle().fill(RadialGradient(colors: [.white.opacity(0.5), .white.opacity(0)], center: UnitPoint(x: 0.3, y: 0.25), startRadius: 0, endRadius: size * 0.6))
+            RoundedRectangle(cornerRadius: size * 0.27, style: .continuous).fill(Theme.heroFill)
             Image(nsImage: MenuBarIcon.tally)
                 .renderingMode(.template)
                 .resizable()
@@ -234,7 +208,6 @@ struct LogoBubble: View {
                 .frame(width: size * 0.62)
         }
         .frame(width: size, height: size)
-        .shadow(color: Theme.green.opacity(0.35), radius: 3, y: 1)
     }
 }
 
