@@ -6,7 +6,7 @@ import type { ModelPrice, NonTokenPrice, PricingCatalog, SubscriptionPlan } from
  *
  * `verified: true` entries were checked against the vendor's official pricing page
  * (Anthropic values: platform.claude.com/docs/en/pricing, as cached 2026-06-24 in the
- * Claude API reference). Entries marked `verified: false` are best-effort seeds and are
+ * Claude API reference; Opus 5.5, Sonnet 5.5 and Haiku 5.5 checked on the live page 2026-10-19). Entries marked `verified: false` are best-effort seeds and are
  * flagged in the UI until the catalog refresh (`clai pricing update`) confirms them.
  */
 
@@ -41,6 +41,7 @@ export const MODELS: ModelPrice[] = [
   m({ provider: A, id: 'claude-fable-5-1', displayName: 'Claude Fable 5.1', family: 'fable', tier: 'frontier', input: 10, output: 50, cacheRead: 0.25, cacheWrite5m: 12.5, cacheWrite1h: 20, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC, note: 'Cache reads $0.25/MTok (0.025x).' }),
   m({ provider: A, id: 'claude-mythos-5-1', displayName: 'Claude Mythos 5.1', family: 'fable', tier: 'frontier', input: 10, output: 50, cacheRead: 0.25, cacheWrite5m: 12.5, cacheWrite1h: 20, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC, note: 'Project Glasswing only; same pricing as Fable 5.1.' }),
   m({ provider: A, id: 'claude-fable-5', displayName: 'Claude Fable 5', family: 'fable', tier: 'frontier', input: 10, output: 50, cacheRead: 1, cacheWrite5m: 12.5, cacheWrite1h: 20, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC, aliases: ['claude-mythos-5', 'claude-mythos-preview'] }),
+  m({ provider: A, id: 'claude-opus-5-5', displayName: 'Claude Opus 5.5', family: 'opus', tier: 'frontier', input: 4, output: 20, cacheRead: 0.2, cacheWrite5m: 5, cacheWrite1h: 8, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC, note: 'Cache reads $0.20/MTok (0.05x).' }),
   m({ provider: A, id: 'claude-opus-5', displayName: 'Claude Opus 5', family: 'opus', tier: 'frontier', input: 5, output: 25, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC }),
   m({ provider: A, id: 'claude-opus-4-8', displayName: 'Claude Opus 4.8', family: 'opus', tier: 'frontier', input: 5, output: 25, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC }),
   m({ provider: A, id: 'claude-opus-4-7', displayName: 'Claude Opus 4.7', family: 'opus', tier: 'frontier', input: 5, output: 25, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC }),
@@ -48,11 +49,13 @@ export const MODELS: ModelPrice[] = [
   m({ provider: A, id: 'claude-opus-4-5', displayName: 'Claude Opus 4.5', family: 'opus', tier: 'frontier', input: 5, output: 25, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10, contextWindow: 200_000, maxOutput: 64_000, verified: true, source: ANTHROPIC_SRC, aliases: ['claude-opus-4-5-20251101'] }),
   m({ provider: A, id: 'claude-opus-4-1', displayName: 'Claude Opus 4.1', family: 'opus', tier: 'frontier', input: 15, output: 75, cacheRead: 1.5, cacheWrite5m: 18.75, cacheWrite1h: 30, contextWindow: 200_000, maxOutput: 32_000, verified: true, source: ANTHROPIC_SRC, aliases: ['claude-opus-4-1-20250805'], deprecated: '2026-02-05', retired: '2026-08-05', note: PLATFORM_RETIRED }),
   m({ provider: A, id: 'claude-opus-4', displayName: 'Claude Opus 4', family: 'opus', tier: 'frontier', input: 15, output: 75, cacheRead: 1.5, cacheWrite5m: 18.75, cacheWrite1h: 30, contextWindow: 200_000, maxOutput: 32_000, verified: true, source: ANTHROPIC_SRC, aliases: ['claude-opus-4-20250514', 'claude-opus-4-0'], deprecated: '2026-01-01', retired: '2026-09-01', note: PLATFORM_RETIRED }),
+  m({ provider: A, id: 'claude-sonnet-5-5', displayName: 'Claude Sonnet 5.5', family: 'sonnet', tier: 'mid', input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2.5, cacheWrite1h: 4, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC, note: 'Cache reads $0.10/MTok (0.05x).' }),
   m({ provider: A, id: 'claude-sonnet-5', displayName: 'Claude Sonnet 5', family: 'sonnet', tier: 'mid', input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 4, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC, note: 'Introductory $2/$10 pricing made permanent on 2026-09-01.' }),
   m({ provider: A, id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', family: 'sonnet', tier: 'mid', input: 3, output: 15, cacheRead: 0.3, cacheWrite5m: 3.75, cacheWrite1h: 6, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC }),
   m({ provider: A, id: 'claude-sonnet-4-5', displayName: 'Claude Sonnet 4.5', family: 'sonnet', tier: 'mid', input: 3, output: 15, cacheRead: 0.3, cacheWrite5m: 3.75, cacheWrite1h: 6, contextWindow: 200_000, maxOutput: 64_000, longContext: SONNET_LONG, verified: true, source: ANTHROPIC_SRC, aliases: ['claude-sonnet-4-5-20250929'], note: '200K context by default; the 1M beta bills >200K requests at 2x input / 1.5x output (confirmed on Vertex partner pricing).' }),
   m({ provider: A, id: 'claude-sonnet-4', displayName: 'Claude Sonnet 4', family: 'sonnet', tier: 'mid', input: 3, output: 15, cacheRead: 0.3, cacheWrite5m: 3.75, cacheWrite1h: 6, contextWindow: 200_000, maxOutput: 64_000, longContext: SONNET_LONG, verified: true, source: ANTHROPIC_SRC, aliases: ['claude-sonnet-4-20250514', 'claude-sonnet-4-0'], deprecated: '2026-01-01', retired: '2026-09-01', note: PLATFORM_RETIRED }),
   m({ provider: A, id: 'claude-3-7-sonnet', displayName: 'Claude Sonnet 3.7', family: 'sonnet', tier: 'mid', input: 3, output: 15, cacheRead: 0.3, cacheWrite5m: 3.75, cacheWrite1h: 6, contextWindow: 200_000, maxOutput: 64_000, verified: true, source: ANTHROPIC_SRC, aliases: ['claude-3-7-sonnet-20250219', 'claude-3-7-sonnet-latest'], retired: '2026-02-19' }),
+  m({ provider: A, id: 'claude-haiku-5-5', displayName: 'Claude Haiku 5.5', family: 'haiku', tier: 'small', input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite5m: 0.125, cacheWrite1h: 0.2, longContext: { threshold: 100_000, input: 0.5, output: 2.5, cacheRead: 0.05, cacheWrite5m: 0.625, cacheWrite1h: 1 }, contextWindow: 1_000_000, maxOutput: 128_000, verified: true, source: ANTHROPIC_SRC, note: 'Priced by prompt length: a request whose prompt (input, cache reads and cache writes) is over 100,000 tokens pays the higher tier.' }),
   m({ provider: A, id: 'claude-haiku-4-5', displayName: 'Claude Haiku 4.5', family: 'haiku', tier: 'small', input: 1, output: 5, cacheRead: 0.1, cacheWrite5m: 1.25, cacheWrite1h: 2, contextWindow: 200_000, maxOutput: 64_000, verified: true, source: ANTHROPIC_SRC, aliases: ['claude-haiku-4-5-20251001'] }),
   m({ provider: A, id: 'claude-3-5-haiku', displayName: 'Claude Haiku 3.5', family: 'haiku', tier: 'small', input: 0.8, output: 4, cacheRead: 0.08, cacheWrite5m: 1, cacheWrite1h: 1.6, contextWindow: 200_000, maxOutput: 8_192, verified: true, source: ANTHROPIC_SRC, aliases: ['claude-3-5-haiku-20241022', 'claude-3-5-haiku-latest'], retired: '2026-02-19', note: PLATFORM_RETIRED }),
   m({ provider: A, id: 'claude-3-haiku', displayName: 'Claude Haiku 3', family: 'haiku', tier: 'small', input: 0.25, output: 1.25, cacheRead: 0.03, cacheWrite5m: 0.3, cacheWrite1h: 0.5, contextWindow: 200_000, maxOutput: 4_096, verified: true, source: ANTHROPIC_SRC, aliases: ['claude-3-haiku-20240307'], deprecated: '2025-10-01', retired: '2026-04-19' }),
@@ -197,8 +200,8 @@ export const SUBSCRIPTIONS: SubscriptionPlan[] = [
 
 /** Hand-curated seed (Anthropic entries verified against the official pricing page). */
 export const SEED_CATALOG: PricingCatalog = {
-  version: '2026-09-03',
-  generatedAt: '2026-09-03T00:00:00.000Z',
+  version: '2026-10-19',
+  generatedAt: '2026-10-19T00:00:00.000Z',
   models: MODELS,
   nonToken: NON_TOKEN,
   subscriptions: SUBSCRIPTIONS,
@@ -252,8 +255,20 @@ export function normalizeCatalog(c: PricingCatalog): PricingCatalog {
   return { ...c, models };
 }
 
+/** The later of two ISO dates (catalog versions and timestamps compare as strings). */
+function newest(a: string, b: string | undefined): string {
+  return b !== undefined && b > a ? b : a;
+}
+
+/**
+ * The effective catalog is as new as its newest part: a hand-curated Anthropic update bumps the
+ * version just as a research refresh does, and a new version reprices stored events once
+ * (`repriceIfCatalogChanged` in @claii/server).
+ */
 export const CATALOG: PricingCatalog = mergeCatalog(SEED_CATALOG, {
   ...RESEARCH,
+  version: newest(SEED_CATALOG.version, RESEARCH.version),
+  generatedAt: newest(SEED_CATALOG.generatedAt, RESEARCH.generatedAt),
   models: (RESEARCH.models ?? []).filter((m) => m.provider !== 'anthropic' || !MODELS.some((s) => s.id === m.id)),
   subscriptions: [],
 });

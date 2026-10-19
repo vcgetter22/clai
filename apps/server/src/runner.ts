@@ -128,7 +128,23 @@ export interface ScanHooks {
   onResult?: (result: RunResult) => void;
 }
 
+/** The catalog version the stored events were last priced with (see `repriceIfCatalogChanged`). */
+export const PRICED_WITH_KEY = 'pricing.pricedWith';
+
+/**
+ * Stored events keep the price they were ingested with. When the catalog changes (an upgrade
+ * brings new models or prices), reprice them once so earlier usage shows the current list prices,
+ * e.g. Claude Opus 5.5 events that an older catalog priced as Opus 5. Returns the events changed.
+ */
+export async function repriceIfCatalogChanged(store: EventStore, catalog: PricingCatalog): Promise<number> {
+  if ((await store.getSetting(PRICED_WITH_KEY)) === catalog.version) return 0;
+  const changed = await store.repriceAll(catalog);
+  await store.setSetting(PRICED_WITH_KEY, catalog.version);
+  return changed;
+}
+
 export async function runLocalScan(opts: RunnerOptions, scan: ScanOptions = {}, only?: string[], hooks: ScanHooks = {}): Promise<RunResult[]> {
+  await repriceIfCatalogChanged(opts.store, opts.catalog);
   const out: RunResult[] = [];
   for (const c of localConnectors as LocalConnector[]) {
     if (only && !only.includes(c.id)) continue;

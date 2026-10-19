@@ -38,6 +38,15 @@ describe('resolveModel', () => {
     expect(resolveModel(CATALOG, 'anthropic/claude-opus-4.1').price?.id).toBe('claude-opus-4-1');
     expect(resolveModel(CATALOG, 'openai/gpt-5-mini').price?.id).toBe('gpt-5-mini');
   });
+  it('prices the 5.5 generation as itself, not as the 5 model its id starts with', () => {
+    // claude-opus-5-5 used to fall through to a prefix match on claude-opus-5 (Opus 5 prices).
+    for (const id of ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']) {
+      const r = resolveModel(CATALOG, id);
+      expect(r.price?.id).toBe(id);
+      expect(r.match).toBe('exact');
+    }
+    expect(resolveModel(CATALOG, 'us.anthropic.claude-opus-5-5').price?.id).toBe('claude-opus-5-5');
+  });
   it('falls back to longest prefix match', () => {
     expect(resolveModel(CATALOG, 'gpt-5-mini-2026-01-01').price?.id).toBe('gpt-5-mini');
     expect(resolveModel(CATALOG, 'gemini-2.5-flash-lite-preview-09-2025').price?.id).toBe('gemini-2.5-flash-lite');
@@ -99,6 +108,30 @@ describe('computeCost', () => {
     expect(sonnetAbove.input).toBeCloseTo(1.5, 6);
     expect(sonnetAbove.output).toBeCloseTo(0.0225, 6);
   });
+  it('prices Opus 5.5 at its own rates (cache reads 0.05x input)', () => {
+    const opus55 = resolveModel(CATALOG, 'claude-opus-5-5').price!;
+    const c = computeCost(CATALOG, opus55, { ...emptyUsage(), input: 1_000_000, output: 100_000, cacheRead: 2_000_000, cacheWrite5m: 500_000, cacheWrite1h: 100_000, requests: 1 });
+    expect(c.input).toBeCloseTo(4, 6);
+    expect(c.output).toBeCloseTo(2, 6);
+    expect(c.cacheRead).toBeCloseTo(0.4, 6);
+    expect(c.cacheWrite5m).toBeCloseTo(2.5, 6);
+    expect(c.cacheWrite1h).toBeCloseTo(0.8, 6);
+  });
+  it('prices Haiku 5.5 by prompt length, cache reads and writes included', () => {
+    const haiku55 = resolveModel(CATALOG, 'claude-haiku-5-5').price!;
+    // 60k input + 40k cache read = 100k: not over the threshold.
+    const at = computeCost(CATALOG, haiku55, { ...emptyUsage(), input: 60_000, cacheRead: 40_000, output: 1_000, requests: 1 });
+    expect(at.longContextApplied).toBe(false);
+    expect(at.input).toBeCloseTo(0.006, 9); // 60k * $0.10
+    expect(at.cacheRead).toBeCloseTo(0.0004, 9); // 40k * $0.01
+    expect(at.output).toBeCloseTo(0.0005, 9); // 1k * $0.50
+    // One more cached token tips the whole request into the higher tier.
+    const over = computeCost(CATALOG, haiku55, { ...emptyUsage(), input: 60_000, cacheRead: 40_001, output: 1_000, requests: 1 });
+    expect(over.longContextApplied).toBe(true);
+    expect(over.input).toBeCloseTo(0.03, 9); // 60k * $0.50
+    expect(over.cacheRead).toBeCloseTo(40_001 * 0.05 / 1e6, 9);
+    expect(over.output).toBeCloseTo(0.0025, 9); // 1k * $2.50
+  });
   it('does not detect long context for bucketed data unless told', () => {
     const gemini = resolveModel(CATALOG, 'gemini-2.5-pro').price!;
     const c = computeCost(CATALOG, gemini, { ...emptyUsage(), input: 5_000_000, output: 0, requests: 100 }, { detectLongContext: false });
@@ -133,6 +166,9 @@ describe('computeCost', () => {
 });
 
 describe('catalog integrity', () => {
+  it('is as new as its newest part', () => {
+    expect(CATALOG.version).toBe('2026-10-19');
+  });
   it('has unique ids and aliases', () => {
     const seen = new Set<string>();
     for (const m of CATALOG.models) {
