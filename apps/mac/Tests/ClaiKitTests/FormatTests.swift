@@ -26,6 +26,16 @@ final class FormatTests: XCTestCase {
         XCTAssertEqual(Format.usdShort(12_400), "$12k")
     }
 
+    func testAxisTicks() {
+        XCTAssertEqual(Format.axisUsd(0), "$0")
+        XCTAssertEqual(Format.axisUsd(5), "$5")
+        XCTAssertEqual(Format.axisUsd(200), "$200")
+        XCTAssertEqual(Format.axisUsd(2.5), "$2.50")
+        XCTAssertEqual(Format.axisUsd(0.25), "$0.25")
+        XCTAssertEqual(Format.axisUsd(1500), "$1.5k")
+        XCTAssertEqual(Format.axisUsd(20_000), "$20k")
+    }
+
     func testTokens() {
         XCTAssertEqual(Format.tokens(950), "950")
         XCTAssertEqual(Format.tokens(12_345), "12.3k")

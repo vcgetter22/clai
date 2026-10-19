@@ -227,6 +227,8 @@ final class AppModel {
 
     var menuBarTitle: String {
         guard let snapshot else { return status == .starting && !isDemo ? "…" : "" }
+        // Until the first usage arrives there is no figure worth showing, only the tally.
+        if snapshot.isEmpty { return "" }
         switch prefs.menuBarDisplay {
         case .today: return Format.usdShort(snapshot.today.usd)
         case .month: return Format.usdShort(snapshot.month.usd)

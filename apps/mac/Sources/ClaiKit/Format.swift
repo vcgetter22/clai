@@ -23,6 +23,15 @@ public enum Format {
         return usd(value)
     }
 
+    /// Chart axis ticks: whole dollars when the tick is whole (`$0`, `$5`, `$200`), cents only
+    /// when a tick needs them (`$2.50`), compact from $1,000 (`$1.5k`).
+    public static func axisUsd(_ value: Double) -> String {
+        guard !value.isNaN, value.isFinite else { return "-" }
+        if abs(value) >= 1000 { return usd(value, compact: true) }
+        if value == value.rounded() { return "$" + grouped(Int(value)) }
+        return "$" + fixed(value, 2)
+    }
+
     /// `950`, `12.3k`, `123k`, `4.5M`, `123M`, `1.20B`.
     public static func tokens(_ value: Double) -> String {
         if value >= 1e9 { return fixed(value / 1e9, 2) + "B" }

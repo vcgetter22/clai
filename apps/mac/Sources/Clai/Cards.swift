@@ -129,7 +129,7 @@ struct DailyChartCard: View {
                     .foregroundStyle(Color.primary.opacity(0.12))
                 AxisValueLabel {
                     if let amount = value.as(Double.self) {
-                        Text(Format.usd(amount, compact: true))
+                        Text(Format.axisUsd(amount))
                             .font(.system(size: 9, weight: .medium, design: .rounded))
                     }
                 }
