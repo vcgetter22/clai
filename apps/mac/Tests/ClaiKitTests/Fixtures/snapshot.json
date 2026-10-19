@@ -1,0 +1,678 @@
+{
+  "schema": 1,
+  "generatedAt": "2026-10-19T15:00:00.000Z",
+  "engineVersion": "0.4.0",
+  "timeZone": "UTC",
+  "pricingVersion": "2026-09-03",
+  "events": {
+    "total": 259,
+    "first": "2026-08-01T09:30:00Z",
+    "last": "2026-10-19T16:45:00Z"
+  },
+  "scan": {
+    "durationMs": 412,
+    "inserted": 14,
+    "sources": [
+      {
+        "id": "claude-code",
+        "label": "Claude Code",
+        "found": true,
+        "summary": "claude-code data",
+        "inserted": 12,
+        "error": null
+      },
+      {
+        "id": "codex-cli",
+        "label": "Codex CLI",
+        "found": true,
+        "summary": "codex-cli data",
+        "inserted": 2,
+        "error": null
+      },
+      {
+        "id": "gemini-cli",
+        "label": "Gemini CLI",
+        "found": true,
+        "summary": "gemini-cli data",
+        "inserted": 0,
+        "error": null
+      },
+      {
+        "id": "opencode",
+        "label": "OpenCode",
+        "found": false,
+        "summary": "No opencode data",
+        "inserted": 0,
+        "error": null
+      },
+      {
+        "id": "cline",
+        "label": "Cline / Roo Code",
+        "found": false,
+        "summary": "No cline data",
+        "inserted": 0,
+        "error": null
+      },
+      {
+        "id": "aider",
+        "label": "Aider",
+        "found": false,
+        "summary": "No aider data",
+        "inserted": 0,
+        "error": null
+      }
+    ],
+    "watchPaths": [
+      "/Users/me/.claude",
+      "/Users/me/.codex/sessions",
+      "/Users/me/.gemini"
+    ]
+  },
+  "today": {
+    "day": "2026-10-19",
+    "usd": 67.7607,
+    "events": 3
+  },
+  "yesterday": {
+    "day": "2026-10-18",
+    "usd": 22.18,
+    "events": 3
+  },
+  "last7Days": {
+    "usd": 605.68,
+    "events": 22
+  },
+  "month": {
+    "key": "2026-10",
+    "usd": 1081.8608,
+    "events": 60,
+    "daysElapsed": 19,
+    "daysInMonth": 31,
+    "tokens": 713181713,
+    "billedUsd": null,
+    "basis": "api-equivalent"
+  },
+  "lastMonth": {
+    "key": "2026-09",
+    "usd": 1397.185,
+    "events": 99
+  },
+  "forecast": {
+    "projectedUsd": 1737.42,
+    "avgDailyUsd": 52.09,
+    "deltaVsLastMonth": 0.24,
+    "method": "weekday-weighted",
+    "confidence": "high"
+  },
+  "daily": [
+    {
+      "day": "2026-09-20",
+      "usd": 21.6,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 20.32,
+        "google": 1.28
+      }
+    },
+    {
+      "day": "2026-09-21",
+      "usd": 60.64,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 51.58,
+        "openai": 9.05
+      }
+    },
+    {
+      "day": "2026-09-22",
+      "usd": 61.94,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 53.29,
+        "openai": 8.65
+      }
+    },
+    {
+      "day": "2026-09-23",
+      "usd": 55.17,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 46.93,
+        "openai": 8.24
+      }
+    },
+    {
+      "day": "2026-09-24",
+      "usd": 56.03,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 48.2,
+        "openai": 7.83
+      }
+    },
+    {
+      "day": "2026-09-25",
+      "usd": 45.26,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 42.36,
+        "google": 2.9
+      }
+    },
+    {
+      "day": "2026-09-26",
+      "usd": 15.26,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 15.26
+      }
+    },
+    {
+      "day": "2026-09-27",
+      "usd": 13.5,
+      "events": 2,
+      "byProvider": {
+        "anthropic": 13.5
+      }
+    },
+    {
+      "day": "2026-09-28",
+      "usd": 46.72,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 40.2,
+        "openai": 6.53
+      }
+    },
+    {
+      "day": "2026-09-29",
+      "usd": 42.55,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 36.2,
+        "openai": 6.35
+      }
+    },
+    {
+      "day": "2026-09-30",
+      "usd": 47.24,
+      "events": 5,
+      "byProvider": {
+        "anthropic": 38.54,
+        "google": 2.44,
+        "openai": 6.26
+      }
+    },
+    {
+      "day": "2026-10-01",
+      "usd": 41.82,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 35.58,
+        "openai": 6.24
+      }
+    },
+    {
+      "day": "2026-10-02",
+      "usd": 38.89,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 38.89
+      }
+    },
+    {
+      "day": "2026-10-03",
+      "usd": 12.89,
+      "events": 2,
+      "byProvider": {
+        "anthropic": 12.89
+      }
+    },
+    {
+      "day": "2026-10-04",
+      "usd": 14.42,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 14.42
+      }
+    },
+    {
+      "day": "2026-10-05",
+      "usd": 49.44,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 39.75,
+        "google": 2.72,
+        "openai": 6.98
+      }
+    },
+    {
+      "day": "2026-10-06",
+      "usd": 52.39,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 45.07,
+        "openai": 7.32
+      }
+    },
+    {
+      "day": "2026-10-07",
+      "usd": 51.57,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 43.87,
+        "openai": 7.7
+      }
+    },
+    {
+      "day": "2026-10-08",
+      "usd": 58.04,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 49.93,
+        "openai": 8.11
+      }
+    },
+    {
+      "day": "2026-10-09",
+      "usd": 48.56,
+      "events": 2,
+      "byProvider": {
+        "anthropic": 48.56
+      }
+    },
+    {
+      "day": "2026-10-10",
+      "usd": 20.47,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 19.25,
+        "google": 1.22
+      }
+    },
+    {
+      "day": "2026-10-11",
+      "usd": 18.57,
+      "events": 2,
+      "byProvider": {
+        "anthropic": 18.57
+      }
+    },
+    {
+      "day": "2026-10-12",
+      "usd": 69.13,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 59.47,
+        "openai": 9.66
+      }
+    },
+    {
+      "day": "2026-10-13",
+      "usd": 66.61,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 56.67,
+        "openai": 9.95
+      }
+    },
+    {
+      "day": "2026-10-14",
+      "usd": 291.26,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 250.57,
+        "openai": 40.69
+      }
+    },
+    {
+      "day": "2026-10-15",
+      "usd": 73.15,
+      "events": 4,
+      "byProvider": {
+        "anthropic": 58.81,
+        "google": 4.02,
+        "openai": 10.32
+      }
+    },
+    {
+      "day": "2026-10-16",
+      "usd": 64.02,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 64.02
+      }
+    },
+    {
+      "day": "2026-10-17",
+      "usd": 20.7,
+      "events": 2,
+      "byProvider": {
+        "anthropic": 20.7
+      }
+    },
+    {
+      "day": "2026-10-18",
+      "usd": 22.18,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 22.18
+      }
+    },
+    {
+      "day": "2026-10-19",
+      "usd": 67.76,
+      "events": 3,
+      "byProvider": {
+        "anthropic": 57.64,
+        "openai": 10.12
+      }
+    }
+  ],
+  "providers": [
+    {
+      "key": "anthropic",
+      "label": "Anthropic",
+      "provider": "anthropic",
+      "usd": 956.8291,
+      "share": 0.8844,
+      "events": 47,
+      "tokens": 657367774
+    },
+    {
+      "key": "openai",
+      "label": "OpenAI",
+      "provider": "openai",
+      "usd": 117.0777,
+      "share": 0.1082,
+      "events": 10,
+      "tokens": 53810735
+    },
+    {
+      "key": "google",
+      "label": "Google",
+      "provider": "google",
+      "usd": 7.9539,
+      "share": 0.0074,
+      "events": 3,
+      "tokens": 2003204
+    }
+  ],
+  "tools": [
+    {
+      "key": "claude-code",
+      "label": "Claude Code",
+      "provider": "anthropic",
+      "usd": 956.8291,
+      "share": 0.8844,
+      "events": 47,
+      "tokens": 657367774
+    },
+    {
+      "key": "codex-cli",
+      "label": "Codex CLI",
+      "provider": "openai",
+      "usd": 117.0777,
+      "share": 0.1082,
+      "events": 10,
+      "tokens": 53810735
+    },
+    {
+      "key": "gemini-cli",
+      "label": "Gemini CLI",
+      "provider": "google",
+      "usd": 7.9539,
+      "share": 0.0074,
+      "events": 3,
+      "tokens": 2003204
+    }
+  ],
+  "models": [
+    {
+      "key": "claude-opus-5",
+      "label": "Claude Opus 5",
+      "provider": "anthropic",
+      "usd": 914.5775,
+      "share": 0.8454,
+      "events": 38,
+      "tokens": 591349552
+    },
+    {
+      "key": "gpt-5.5",
+      "label": "GPT-5.5",
+      "provider": "openai",
+      "usd": 117.0777,
+      "share": 0.1082,
+      "events": 10,
+      "tokens": 53810735
+    },
+    {
+      "key": "claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "provider": "anthropic",
+      "usd": 42.2517,
+      "share": 0.0391,
+      "events": 9,
+      "tokens": 66018222
+    },
+    {
+      "key": "gemini-2.5-pro",
+      "label": "Gemini 2.5 Pro",
+      "provider": "google",
+      "usd": 7.9539,
+      "share": 0.0074,
+      "events": 3,
+      "tokens": 2003204
+    }
+  ],
+  "projects": [
+    {
+      "key": "clai",
+      "label": "clai",
+      "provider": null,
+      "usd": 776.9627,
+      "share": 0.7182,
+      "events": 29,
+      "tokens": 491418664
+    },
+    {
+      "key": "site",
+      "label": "site",
+      "provider": null,
+      "usd": 262.6464,
+      "share": 0.2428,
+      "events": 22,
+      "tokens": 155744827
+    },
+    {
+      "key": "notes",
+      "label": "notes",
+      "provider": null,
+      "usd": 42.2517,
+      "share": 0.0391,
+      "events": 9,
+      "tokens": 66018222
+    }
+  ],
+  "plans": [
+    {
+      "id": "anthropic-max_5x",
+      "provider": "anthropic",
+      "plan": "max_5x",
+      "label": "Claude Max 5x",
+      "priceMonthly": 100,
+      "mtdUsd": 956.83,
+      "projectedUsd": 1534.54,
+      "lastMonthUsd": 1232.31,
+      "multiple": 12.32
+    }
+  ],
+  "budgets": [
+    {
+      "id": "ai-tools",
+      "name": "AI tools",
+      "amountUsd": 1500,
+      "mtdUsd": 1081.86,
+      "projectedUsd": 1737.42,
+      "usedPct": 0.72,
+      "projectedPct": 1.16
+    }
+  ],
+  "insights": [
+    {
+      "id": "long_context_premium",
+      "kind": "long_context_premium",
+      "severity": "warning",
+      "title": "258 requests exceeded 200k tokens of context on models with a long-context premium",
+      "detail": "Above 200k input tokens these models bill 2x input and 1.5x output.",
+      "action": "Compact or restart sessions before they cross 200k tokens, or use a model with 1M context at standard pricing.",
+      "impactUsdPerMonth": null
+    },
+    {
+      "id": "model_mix:anthropic",
+      "kind": "model_mix",
+      "severity": "opportunity",
+      "title": "96% of anthropic spend runs on frontier models (claude-opus-5)",
+      "detail": "Frontier usage cost $3,273 in this period. The same tokens on Claude Sonnet 5 would cost $1,309.",
+      "action": "Routing 30% of frontier work (simple edits, summaries, boilerplate) to Claude Sonnet 5 would save about $589 per period.",
+      "impactUsdPerMonth": 589.17
+    },
+    {
+      "id": "model_mix:openai",
+      "kind": "model_mix",
+      "severity": "opportunity",
+      "title": "100% of openai spend runs on frontier models (gpt-5.5)",
+      "detail": "Frontier usage cost $410 in this period. The same tokens on GPT-5 Mini would cost $24.06.",
+      "action": "Routing 30% of frontier work (simple edits, summaries, boilerplate) to GPT-5 Mini would save about $116 per period.",
+      "impactUsdPerMonth": 115.83
+    },
+    {
+      "id": "model_mix:google",
+      "kind": "model_mix",
+      "severity": "opportunity",
+      "title": "100% of google spend runs on frontier models (gemini-2.5-pro)",
+      "detail": "Frontier usage cost $38.39 in this period. The same tokens on Gemini 2.5 Flash would cost $5.45.",
+      "action": "Routing 30% of frontier work (simple edits, summaries, boilerplate) to Gemini 2.5 Flash would save about $9.88 per period.",
+      "impactUsdPerMonth": 9.88
+    },
+    {
+      "id": "context_size",
+      "kind": "context_size",
+      "severity": "opportunity",
+      "title": "Average agent request carries 9.5M tokens of context",
+      "detail": "Cache reads and writes make up 57% of agent cost. Long sessions re-send the whole conversation on every turn, so cost per request grows with session length.",
+      "action": "Start fresh sessions for new tasks and compact long ones; each 100k tokens of context trimmed saves roughly $0.043 per request.",
+      "impactUsdPerMonth": null
+    }
+  ],
+  "planOptions": [
+    {
+      "provider": "anthropic",
+      "plan": "pro",
+      "label": "Claude Pro",
+      "priceMonthly": 20
+    },
+    {
+      "provider": "anthropic",
+      "plan": "max_5x",
+      "label": "Claude Max 5x",
+      "priceMonthly": 100
+    },
+    {
+      "provider": "anthropic",
+      "plan": "max_20x",
+      "label": "Claude Max 20x",
+      "priceMonthly": 200
+    },
+    {
+      "provider": "openai",
+      "plan": "go",
+      "label": "ChatGPT Go",
+      "priceMonthly": 8
+    },
+    {
+      "provider": "openai",
+      "plan": "plus",
+      "label": "ChatGPT Plus",
+      "priceMonthly": 20
+    },
+    {
+      "provider": "openai",
+      "plan": "pro",
+      "label": "ChatGPT Pro",
+      "priceMonthly": 200
+    },
+    {
+      "provider": "google",
+      "plan": "ai_pro",
+      "label": "Google AI Pro",
+      "priceMonthly": 19.99
+    },
+    {
+      "provider": "google",
+      "plan": "ai_ultra",
+      "label": "Google AI Ultra",
+      "priceMonthly": 249.99
+    },
+    {
+      "provider": "cursor",
+      "plan": "pro",
+      "label": "Cursor Pro",
+      "priceMonthly": 20
+    },
+    {
+      "provider": "cursor",
+      "plan": "pro_plus",
+      "label": "Cursor Pro+",
+      "priceMonthly": 60
+    },
+    {
+      "provider": "cursor",
+      "plan": "ultra",
+      "label": "Cursor Ultra",
+      "priceMonthly": 200
+    },
+    {
+      "provider": "github",
+      "plan": "copilot_pro",
+      "label": "GitHub Copilot Pro",
+      "priceMonthly": 10
+    },
+    {
+      "provider": "github",
+      "plan": "copilot_pro_plus",
+      "label": "GitHub Copilot Pro+",
+      "priceMonthly": 39
+    },
+    {
+      "provider": "xai",
+      "plan": "supergrok",
+      "label": "SuperGrok",
+      "priceMonthly": 30
+    },
+    {
+      "provider": "xai",
+      "plan": "supergrok_heavy",
+      "label": "SuperGrok Heavy",
+      "priceMonthly": 300
+    },
+    {
+      "provider": "perplexity",
+      "plan": "pro",
+      "label": "Perplexity Pro",
+      "priceMonthly": 20
+    },
+    {
+      "provider": "perplexity",
+      "plan": "max",
+      "label": "Perplexity Max",
+      "priceMonthly": 200
+    },
+    {
+      "provider": "mistral",
+      "plan": "le_chat_pro",
+      "label": "Le Chat Pro",
+      "priceMonthly": 14.99
+    }
+  ]
+}

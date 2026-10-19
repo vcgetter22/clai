@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Context } from 'hono';
 
 const TYPES: Record<string, string> = {
@@ -18,16 +19,22 @@ const TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-/** Locate the built dashboard (apps/dashboard/dist) via the workspace package. */
-export function dashboardDistDir(): string | null {
+/**
+ * Locate the built dashboard: `$CLAI_DASHBOARD_DIR`, then the installed `@claii/dashboard`
+ * package, then a `dashboard/` folder next to this module (the single-file engine bundle that
+ * clai for Mac ships, see scripts/bundle-engine.mjs).
+ */
+export function dashboardDistDir(env: NodeJS.ProcessEnv = process.env): string | null {
+  const candidates: string[] = [];
+  if (env['CLAI_DASHBOARD_DIR']) candidates.push(resolve(env['CLAI_DASHBOARD_DIR']));
   try {
     const req = createRequire(import.meta.url);
-    const pkg = req.resolve('@claii/dashboard/package.json');
-    const dist = join(dirname(pkg), 'dist');
-    return existsSync(join(dist, 'index.html')) ? dist : null;
+    candidates.push(join(dirname(req.resolve('@claii/dashboard/package.json')), 'dist'));
   } catch {
-    return null;
+    // Not installed alongside: the bundled engine.
   }
+  candidates.push(join(dirname(fileURLToPath(import.meta.url)), 'dashboard'));
+  return candidates.find((dir) => existsSync(join(dir, 'index.html'))) ?? null;
 }
 
 /** Minimal, safe static file handler with SPA fallback. */

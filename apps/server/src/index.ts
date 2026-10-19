@@ -1,4 +1,5 @@
 export * from './summary.js';
+export * from './snapshot.js';
 export * from './api.js';
 export * from './app.js';
 export * from './runner.js';

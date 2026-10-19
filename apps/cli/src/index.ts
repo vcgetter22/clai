@@ -14,6 +14,7 @@ import { registerPricing } from './commands/pricing.js';
 import { registerReport } from './commands/report.js';
 import { registerScan } from './commands/scan.js';
 import { registerSettings } from './commands/settings.js';
+import { registerSnapshot } from './commands/snapshot.js';
 import { registerStatus } from './commands/status.js';
 import { registerSync } from './commands/sync.js';
 
@@ -53,6 +54,7 @@ export function buildProgram(): Command {
   registerReport(program);
   registerInsights(program);
   registerStatus(program);
+  registerSnapshot(program);
   registerDashboard(program);
   registerConnect(program);
   registerImport(program);
@@ -68,7 +70,7 @@ export function buildProgram(): Command {
 }
 
 const GROUPS: Record<string, string[]> = {
-  'Numbers:': ['scan', 'report', 'insights', 'status', 'dashboard'],
+  'Numbers:': ['scan', 'report', 'insights', 'status', 'snapshot', 'dashboard'],
   'Sources:': ['connect', 'disconnect', 'pull', 'import', 'export'],
   'Team and hosted:': ['login', 'sync'],
   'Setup and tools:': ['plan', 'budget', 'seat', 'config', 'pricing', 'doctor', 'ask'],

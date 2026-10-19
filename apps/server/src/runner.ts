@@ -15,6 +15,9 @@ export interface RunResult {
   error: string | null;
   durationMs: number;
   detail?: string;
+  /** Local scans only: whether the tool was detected on this machine, and the folders it reads. */
+  found?: boolean;
+  paths?: string[];
 }
 
 export interface RunnerOptions {
@@ -133,13 +136,15 @@ export async function runLocalScan(opts: RunnerOptions, scan: ScanOptions = {}, 
     const ctx = await connectorContext(opts, c.id);
     const det = await c.detect(ctx);
     if (!det.found) {
-      const skipped: RunResult = { source: c.id, seen: 0, inserted: 0, updated: 0, unchanged: 0, unpriced: 0, unpricedModels: [], error: null, durationMs: 0, detail: det.summary };
+      const skipped: RunResult = { source: c.id, seen: 0, inserted: 0, updated: 0, unchanged: 0, unpriced: 0, unpricedModels: [], error: null, durationMs: 0, detail: det.summary, found: false, paths: det.paths };
       out.push(skipped);
       hooks.onResult?.(skipped);
       continue;
     }
     const r = await ingest(opts, c.id, c.scan(ctx, scan), ctx);
     r.detail = det.summary;
+    r.found = true;
+    r.paths = det.paths;
     out.push(r);
     hooks.onResult?.(r);
   }

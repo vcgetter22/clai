@@ -3,6 +3,7 @@ export * from './ids.js';
 export * from './time.js';
 export * from './events.js';
 export * from './aggregate.js';
+export * from './labels.js';
 export * from './pricing/types.js';
 export * from './pricing/resolve.js';
 export * from './pricing/cost.js';

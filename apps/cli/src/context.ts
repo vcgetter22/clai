@@ -33,7 +33,11 @@ export interface CliContext {
   close: () => Promise<void>;
 }
 
+/** Set by scripts/bundle-engine.mjs when the CLI is bundled into one file (clai for Mac). */
+declare const __CLAI_VERSION__: string | undefined;
+
 export function cliVersion(): string {
+  if (typeof __CLAI_VERSION__ === 'string') return __CLAI_VERSION__;
   try {
     const req = createRequire(import.meta.url);
     const pkg = req('../package.json') as { version: string };
