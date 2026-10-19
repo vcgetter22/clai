@@ -28,8 +28,9 @@ enum Theme {
         LinearGradient(colors: [mint, teal], startPoint: .top, endPoint: .bottom)
     }
 
+    /// Ledger green to deep green, so white button text stays above 5:1 contrast.
     static var buttonGradient: LinearGradient {
-        LinearGradient(colors: [teal, green], startPoint: .top, endPoint: .bottom)
+        LinearGradient(colors: [green, Color(hex: 0x155C4A)], startPoint: .top, endPoint: .bottom)
     }
 
     static func provider(_ key: String?) -> Color {

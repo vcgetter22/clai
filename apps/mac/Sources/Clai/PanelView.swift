@@ -340,6 +340,8 @@ struct PanelFooter: View {
                         .font(.system(size: 10.5, weight: .medium, design: .rounded))
                         .foregroundStyle(.tertiary)
                         .labelStyle(.titleAndIcon)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
             }
             Spacer(minLength: 4)
