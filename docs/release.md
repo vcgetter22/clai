@@ -37,12 +37,14 @@ Regenerate `packages/core/src/pricing/catalog.research.json` from a refreshed `r
 3. getclai.vercel.app needs no change for a new release: `/download/mac`, `/download/mac-intel` and `install.sh` always resolve to the latest release. Update the version shown on the page (`data-version` in apps/site/public/index.html) and, if the panel changed, `panel-light.png` / `panel-dark.png` from the `screenshots` artifact.
 4. Signing: ad hoc until the repository has the Developer ID secrets listed in apps/mac/README.md; then the same workflow signs and notarizes.
 
+## clai for Mac 0.4.2 (not released yet; on `main` since 0.4.1)
+- Says what it cannot see: on a day without usage on this Mac the Today pill reads "none on this Mac"; the month card, the Today pill (on hover) and Settings explain that cloud sessions and claude.ai chats leave no logs on the Mac.
+- Engine (also in npm 0.4.0, which is published from `main` after 0.4.2): Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5 are priced at their own rates (Opus 5.5 was priced as Opus 5); the first scan after a catalog change reprices stored usage.
+
 ## clai for Mac 0.4.1 (app only; npm stays at 0.4.0)
 - Quieter look: no bubbles, gloss or glow; SF Pro instead of the rounded font; flat buttons; system-style tabs; the month on a plain ledger-green card; no count-up or rise-in animations; a new icon without bubbles. getclai.vercel.app follows suit.
 - The menu bar shows this month's spend by default, the panel's headline figure. Today and icon-only stay in Settings. With no usage yet today it used to read "$0".
 - Release builds take their version from the `mac-v*` tag.
-- Says what it cannot see: on a day without usage on this Mac the Today pill reads "none on this Mac"; the month card, the Today pill (on hover) and Settings explain that cloud sessions and claude.ai chats leave no logs on the Mac.
-- Engine (also in npm 0.4.0, which is published from `main` after this merge): Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5 are priced at their own rates (Opus 5.5 was priced as Opus 5); the first scan after a catalog change reprices stored usage.
 
 ## 0.4.0 (all packages, clai for Mac)
 - CLI: `clai snapshot [--scan]`, one JSON document (schema 1) with everything a glanceable surface shows; `clai login` defaults to https://clai-cloud.vercel.app.
