@@ -1,7 +1,18 @@
+import { createRequire } from 'node:module';
 import { defaultDbPath } from '@claii/store';
 import { SqliteEventStore } from '@claii/store/sqlite';
 import { bootstrapTeam, listen, schedulePulls } from './app.js';
 import { loadCatalog } from './catalog.js';
+
+/** The published package version, reported by `/api/health`. */
+export function serverVersion(): string {
+  try {
+    const req = createRequire(import.meta.url);
+    return (req('../package.json') as { version: string }).version;
+  } catch {
+    return '0.0.0';
+  }
+}
 
 /** `clai-server` entry point (team mode). Configuration via environment variables. */
 export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> {
@@ -11,7 +22,7 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> 
   const { catalog, overridden } = loadCatalog(env);
   const boot = await bootstrapTeam(store, env);
   const log = { debug: () => {}, info: (m: string) => console.log(`[clai-server] ${m}`), warn: (m: string) => console.warn(`[clai-server] ${m}`) };
-  const { url } = await listen({ store, catalog, mode: 'team', version: '0.2.0', port, host: env['HOST'] ?? '0.0.0.0', runner: { log, env } });
+  const { url } = await listen({ store, catalog, mode: 'team', version: serverVersion(), port, host: env['HOST'] ?? '0.0.0.0', runner: { log, env } });
   log.info(`team server listening on ${url} (db: ${dbPath}${overridden ? ', pricing overrides active' : ''})`);
   if (boot.adminTokenCreated) {
     log.info('');
