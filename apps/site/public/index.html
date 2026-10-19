@@ -21,18 +21,6 @@
     <script src="/site.js" defer></script>
   </head>
   <body>
-    <div class="sky" aria-hidden="true">
-      <span class="blob blob-a"></span>
-      <span class="blob blob-b"></span>
-      <span class="blob blob-c"></span>
-      <span class="bubble b1"></span>
-      <span class="bubble b2"></span>
-      <span class="bubble b3"></span>
-      <span class="bubble b4"></span>
-      <span class="bubble b5"></span>
-      <span class="bubble b6"></span>
-    </div>
-
     <header class="nav">
       <a class="brand" href="/" aria-label="clai home">
         <img src="/icon-180.png" alt="" width="30" height="30" />
@@ -50,7 +38,7 @@
     <main>
       <section class="hero">
         <div class="hero-copy reveal">
-          <p class="eyebrow"><span class="dot"></span>clai for Mac · free and open source</p>
+          <p class="eyebrow">clai for Mac · free and open source</p>
           <h1>Your AI spend, live in the menu bar.</h1>
           <p class="lede">
             clai reads the usage logs that Claude Code, Codex, Gemini CLI and other tools already keep on your Mac, prices every token at list price, and shows today, this month and what your plan is worth.
@@ -70,7 +58,7 @@
             <code id="install-cmd">curl -fsSL https://getclai.vercel.app/install.sh | sh</code>
             <button class="copy" type="button" data-copy="install-cmd" aria-label="Copy the install command">Copy</button>
           </div>
-          <p class="fineprint">Version <span data-version>0.4.0</span>. The Terminal install skips the first-launch prompt; the download needs <a href="#first-launch">one extra click</a> the first time.</p>
+          <p class="fineprint">Version <span data-version>0.4.1</span>. The Terminal install skips the first-launch prompt; the download needs <a href="#first-launch">one extra click</a> the first time.</p>
         </div>
 
         <figure class="stage reveal" aria-label="The clai menu bar panel">
@@ -79,7 +67,7 @@
             <span class="menubar-right">
               <span class="mb-item mb-clai" title="clai in the menu bar">
                 <svg viewBox="0 0 18 15" width="16" height="13" aria-hidden="true"><g stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.6 2.5v10M6.9 2.5v10M10.2 2.5v10M13.5 2.5v10M1.6 11.4 16.4 3.6" /></g></svg>
-                <span>$68</span>
+                <span>$1,082</span>
               </span>
               <span class="mb-item" aria-hidden="true">
                 <svg viewBox="0 0 20 14" width="18" height="13"><path d="M10 12.5 1.8 4.3a11.6 11.6 0 0 1 16.4 0z" fill="currentColor" /></svg>
@@ -103,7 +91,7 @@
       </section>
 
       <section class="proof reveal" aria-labelledby="proof-title">
-        <div class="proof-bubble">
+        <div class="proof-card">
           <p class="proof-figure" id="proof-title"><span data-count-to="38.6" data-count-decimals="1">38.6</span>×</p>
           <div>
             <p class="proof-text">One Claude Max 5x plan, $100 a month, delivered <strong>$3,865</strong> of API-priced work in August 2026.</p>
@@ -113,12 +101,12 @@
       </section>
 
       <section class="section" id="how" aria-labelledby="how-title">
-        <h2 id="how-title" class="reveal">What the bubble tells you</h2>
+        <h2 id="how-title" class="reveal">What the panel shows</h2>
         <div class="features">
           <article class="card reveal">
             <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 18V6m5 12V9m5 9v-5m5 5V4" /></svg></span>
-            <h3>Today, at a glance</h3>
-            <p>The menu bar shows today's spend and updates a few seconds after Claude Code, Codex or Gemini CLI write to their logs.</p>
+            <h3>The month, at a glance</h3>
+            <p>The menu bar shows this month's spend, or today's if you prefer, and updates a few seconds after Claude Code, Codex or Gemini CLI write to their logs.</p>
           </article>
           <article class="card reveal">
             <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></svg></span>
@@ -126,7 +114,7 @@
             <p>Tell clai you pay for Claude Max, ChatGPT Pro or Cursor and it shows the API-priced value of what you used, as a multiple of the price.</p>
           </article>
           <article class="card reveal">
-            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="9" r="3.5" /><circle cx="16.5" cy="14.5" r="5" /><circle cx="7" cy="17.5" r="2" /></svg></span>
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z" /><path d="M15.5 2.7A9 9 0 0 1 21.3 8.5h-5.8z" /></svg></span>
             <h3>Where it went</h3>
             <p>This month by tool, model and project, and a 30-day chart that reads out any day you point at.</p>
           </article>

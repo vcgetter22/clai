@@ -36,19 +36,14 @@ const browser = await playwright.chromium.launch();
 {
   const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
   await page.setContent(`<!doctype html><html><head><style>
-    body { margin: 0; width: 1200px; height: 630px; overflow: hidden; font-family: "SF Pro Rounded", ui-rounded, "Nunito", "Segoe UI", system-ui, sans-serif;
-      background: radial-gradient(circle at 85% 12%, rgba(201,245,228,.75), transparent 38%), radial-gradient(circle at 8% 110%, #083f33, transparent 55%), linear-gradient(120deg, #0e5444, #1e7a62 45%, #22a386 78%, #6fd9b8);
-      color: #fff; position: relative; }
-    .b { position: absolute; border-radius: 50%; background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.75), rgba(255,255,255,.12) 38%, rgba(255,255,255,.04) 70%); box-shadow: inset 0 0 0 2px rgba(255,255,255,.35); }
+    body { margin: 0; width: 1200px; height: 630px; overflow: hidden; font-family: -apple-system, "SF Pro Display", "Inter", "Segoe UI", system-ui, sans-serif;
+      background: linear-gradient(180deg, #1e7a62, #0e5444); color: #fff; position: relative; }
     .wrap { position: absolute; left: 84px; top: 50%; transform: translateY(-50%); display: flex; gap: 48px; align-items: center; }
-    img { width: 300px; height: 300px; filter: drop-shadow(0 24px 40px rgba(0,0,0,.25)); margin: -30px; }
-    h1 { font-size: 92px; line-height: 1; margin: 0; letter-spacing: -3px; font-weight: 800; }
-    p { font-size: 38px; line-height: 1.2; margin: 18px 0 0; font-weight: 650; max-width: 720px; opacity: .95; white-space: nowrap; }
-    small { display: block; margin-top: 26px; font-size: 26px; font-weight: 600; opacity: .8; }
+    img { width: 300px; height: 300px; filter: drop-shadow(0 18px 30px rgba(0,0,0,.22)); margin: -30px; }
+    h1 { font-size: 88px; line-height: 1; margin: 0; letter-spacing: -2.5px; font-weight: 700; }
+    p { font-size: 38px; line-height: 1.2; margin: 18px 0 0; font-weight: 600; max-width: 720px; opacity: .95; white-space: nowrap; }
+    small { display: block; margin-top: 26px; font-size: 26px; font-weight: 500; opacity: .8; }
   </style></head><body>
-    <span class="b" style="width:260px;height:260px;right:-70px;bottom:-90px"></span>
-    <span class="b" style="width:90px;height:90px;right:250px;top:60px"></span>
-    <span class="b" style="width:40px;height:40px;left:560px;bottom:70px"></span>
     <div class="wrap"><img src="${icon}"><div><h1>clai for Mac</h1><p>Your AI spend, live in the menu bar.</p><small>Free and open source · getclai.vercel.app</small></div></div>
   </body></html>`);
   writeFileSync(join(pub, 'og.png'), await page.screenshot());

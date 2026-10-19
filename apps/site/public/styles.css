@@ -1,4 +1,4 @@
-/* getclai.vercel.app: Apple-native type and materials, with bubbles. The ledger green from the
+/* getclai.vercel.app: Apple-native type and materials, quiet surfaces. The ledger green from the
    clai design principles stays the one accent; amber and red keep their warning meanings. */
 
 :root {
@@ -10,22 +10,14 @@
   --rule: rgba(15, 26, 22, 0.09);
   --accent: #1e7a62;
   --accent-ink: #145b48;
-  --teal: #22a386;
-  --mint: #6fd9b8;
-  --foam: #c9f5e4;
   --deep: #0e5444;
   --card: rgba(255, 255, 255, 0.66);
   --card-strong: rgba(255, 255, 255, 0.86);
   --card-border: rgba(255, 255, 255, 0.95);
   --shadow: 0 1px 1px rgba(14, 84, 68, 0.04), 0 18px 40px -18px rgba(14, 84, 68, 0.28);
   --shadow-lift: 0 2px 4px rgba(14, 84, 68, 0.06), 0 28px 56px -22px rgba(14, 84, 68, 0.38);
-  --blob-a: rgba(111, 217, 184, 0.55);
-  --blob-b: rgba(34, 163, 134, 0.32);
-  --blob-c: rgba(201, 245, 228, 0.9);
-  --bubble-rim: rgba(255, 255, 255, 0.85);
-  --bubble-fill: rgba(255, 255, 255, 0.35);
   --code-bg: rgba(15, 26, 22, 0.05);
-  --display: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
   --text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   --radius: 28px;
@@ -48,11 +40,6 @@
     --card-border: rgba(255, 255, 255, 0.1);
     --shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 18px 40px -18px rgba(0, 0, 0, 0.7);
     --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.3), 0 28px 56px -22px rgba(0, 0, 0, 0.8);
-    --blob-a: rgba(30, 122, 98, 0.45);
-    --blob-b: rgba(14, 84, 68, 0.55);
-    --blob-c: rgba(79, 190, 156, 0.18);
-    --bubble-rim: rgba(160, 240, 210, 0.35);
-    --bubble-fill: rgba(160, 240, 210, 0.08);
     --code-bg: rgba(255, 255, 255, 0.06);
   }
 }
@@ -71,11 +58,6 @@
   --card-border: rgba(255, 255, 255, 0.1);
   --shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 18px 40px -18px rgba(0, 0, 0, 0.7);
   --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.3), 0 28px 56px -22px rgba(0, 0, 0, 0.8);
-  --blob-a: rgba(30, 122, 98, 0.45);
-  --blob-b: rgba(14, 84, 68, 0.55);
-  --blob-c: rgba(79, 190, 156, 0.18);
-  --bubble-rim: rgba(160, 240, 210, 0.35);
-  --bubble-fill: rgba(160, 240, 210, 0.08);
   --code-bg: rgba(255, 255, 255, 0.06);
 }
 
@@ -92,7 +74,7 @@ html {
 
 body {
   margin: 0;
-  background: var(--ground);
+  background: var(--ground) linear-gradient(180deg, var(--ground-2), var(--ground) 640px) no-repeat;
   color: var(--ink);
   font-family: var(--text);
   font-size: 17px;
@@ -125,67 +107,6 @@ code {
   border-radius: 6px;
 }
 
-/* ---------- Sky: soft blobs and drifting bubbles behind everything ---------- */
-
-.sky {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(60px);
-}
-
-.blob-a {
-  width: 720px;
-  height: 720px;
-  right: -180px;
-  top: -260px;
-  background: radial-gradient(circle at 40% 40%, var(--blob-a), transparent 65%);
-}
-
-.blob-b {
-  width: 640px;
-  height: 640px;
-  left: -260px;
-  top: 340px;
-  background: radial-gradient(circle at 60% 50%, var(--blob-b), transparent 65%);
-}
-
-.blob-c {
-  width: 560px;
-  height: 560px;
-  right: 10%;
-  bottom: -280px;
-  background: radial-gradient(circle, var(--blob-c), transparent 65%);
-}
-
-.bubble {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.9), var(--bubble-fill) 34%, transparent 72%), radial-gradient(circle at 70% 78%, var(--bubble-fill), transparent 60%);
-  box-shadow: inset 0 0 0 1px var(--bubble-rim), inset -6px -8px 18px rgba(34, 163, 134, 0.18);
-  animation: drift 22s ease-in-out infinite alternate;
-}
-
-/* Bubbles keep to the margins so they never sit behind a line of text. */
-.b1 { width: 120px; height: 120px; left: -44px; top: 26%; animation-duration: 26s; }
-.b2 { width: 46px; height: 46px; left: 2.5%; top: 9%; animation-duration: 19s; animation-delay: -6s; }
-.b3 { width: 88px; height: 88px; right: -24px; top: 52%; animation-duration: 24s; animation-delay: -3s; }
-.b4 { width: 30px; height: 30px; left: 1.5%; top: 72%; animation-duration: 17s; animation-delay: -9s; }
-.b5 { width: 150px; height: 150px; right: -50px; bottom: -70px; animation-duration: 30s; animation-delay: -12s; }
-.b6 { width: 22px; height: 22px; right: 2%; top: 20%; animation-duration: 15s; animation-delay: -4s; }
-
-@keyframes drift {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(14px, -36px, 0) scale(1.04); }
-}
-
 /* ---------- Nav ---------- */
 
 .nav {
@@ -211,7 +132,7 @@ code {
   align-items: center;
   gap: 8px;
   font-family: var(--display);
-  font-weight: 800;
+  font-weight: 700;
   font-size: 20px;
   letter-spacing: -0.02em;
   color: var(--ink);
@@ -245,39 +166,26 @@ code {
 /* ---------- Buttons ---------- */
 
 .btn {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   border-radius: 999px;
   font-family: var(--display);
-  font-weight: 700;
+  font-weight: 600;
   color: #fff;
-  /* Ledger green to deep green: white text stays above 5:1 everywhere on the button. */
-  background: linear-gradient(180deg, #1e7a62, #155c4a);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 10px 24px -10px rgba(30, 122, 98, 0.75);
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
-  overflow: hidden;
-}
-
-.btn::before {
-  content: "";
-  position: absolute;
-  inset: 1px 1px 50% 1px;
-  border-radius: 999px 999px 40% 40%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0));
-  pointer-events: none;
+  /* Ledger green: white text 5.2:1, deeper shades under the pointer and when pressed. */
+  background: #1e7a62;
+  transition: background 0.15s ease;
 }
 
 .btn:hover {
   text-decoration: none;
-  transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 16px 32px -12px rgba(30, 122, 98, 0.85);
+  background: #1a6b56;
 }
 
 .btn:active {
-  transform: scale(0.97);
+  background: #155c4a;
 }
 
 .btn-small {
@@ -313,22 +221,14 @@ main {
   align-items: center;
   gap: 8px;
   margin: 0 0 18px;
-  padding: 6px 14px 6px 10px;
+  padding: 6px 14px;
   border-radius: 999px;
   background: var(--card-strong);
   border: 1px solid var(--card-border);
   font-family: var(--display);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--accent-ink);
-}
-
-.eyebrow .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px rgba(79, 190, 156, 0.22);
 }
 
 h1,
@@ -341,8 +241,8 @@ h3 {
 }
 
 h1 {
-  font-size: clamp(42px, 6vw, 70px);
-  font-weight: 800;
+  font-size: clamp(42px, 6vw, 68px);
+  font-weight: 700;
   text-wrap: balance;
 }
 
@@ -412,15 +312,11 @@ h1 {
   color: var(--accent-ink);
   background: rgba(79, 190, 156, 0.16);
   cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s;
+  transition: background 0.15s ease;
 }
 
 .copy:hover {
   background: rgba(79, 190, 156, 0.26);
-}
-
-.copy:active {
-  transform: scale(0.94);
 }
 
 .fineprint {
@@ -504,7 +400,7 @@ h1 {
   margin-right: 46px;
   border-radius: 26px;
   box-shadow: var(--shadow-lift);
-  animation: float-in 0.9s cubic-bezier(0.34, 1.4, 0.64, 1) both 0.15s;
+  animation: fade-in 0.5s ease both 0.1s;
 }
 
 .panel {
@@ -522,9 +418,9 @@ h1 {
   color: var(--faint);
 }
 
-@keyframes float-in {
-  from { opacity: 0; transform: translateY(-14px) scale(0.96); }
-  to { opacity: 1; transform: none; }
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ---------- The real number ---------- */
@@ -533,48 +429,33 @@ h1 {
   padding: 12px 0 36px;
 }
 
-.proof-bubble {
+.proof-card {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 28px;
   align-items: center;
   padding: 30px 36px;
-  border-radius: 36px;
+  border-radius: var(--radius);
   color: #fff;
-  background: radial-gradient(circle at 88% 18%, rgba(201, 245, 228, 0.55), transparent 42%), radial-gradient(circle at 12% 120%, rgba(14, 84, 68, 0.9), transparent 55%), linear-gradient(120deg, var(--deep), var(--accent) 45%, var(--teal) 80%, var(--mint));
-  box-shadow: 0 30px 60px -28px rgba(14, 84, 68, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  position: relative;
-  overflow: hidden;
-}
-
-.proof-bubble::after {
-  content: "";
-  position: absolute;
-  width: 220px;
-  height: 220px;
-  right: -60px;
-  bottom: -90px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.08) 40%, transparent 70%);
-  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.4);
+  background: linear-gradient(180deg, #1e7a62, #0e5444);
+  box-shadow: var(--shadow);
 }
 
 .proof-figure {
   margin: 0;
   font-family: var(--display);
-  font-weight: 800;
-  font-size: clamp(64px, 9vw, 112px);
+  font-weight: 700;
+  font-size: clamp(64px, 9vw, 108px);
   line-height: 0.9;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
 }
 
 .proof-text {
   margin: 0;
   font-family: var(--display);
   font-size: clamp(19px, 2.2vw, 26px);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.3;
   max-width: 24em;
 }
@@ -592,8 +473,8 @@ h1 {
 }
 
 .section h2 {
-  font-size: clamp(30px, 3.6vw, 44px);
-  font-weight: 800;
+  font-size: clamp(30px, 3.6vw, 42px);
+  font-weight: 700;
   max-width: 20em;
 }
 
@@ -618,18 +499,12 @@ h1 {
   box-shadow: var(--shadow);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease;
-}
-
-.card:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: var(--shadow-lift);
 }
 
 .card h3 {
   margin-top: 14px;
-  font-size: 21px;
-  font-weight: 750;
+  font-size: 20px;
+  font-weight: 650;
 }
 
 .card p {
@@ -641,11 +516,10 @@ h1 {
 .glyph {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.65), transparent 45%), linear-gradient(140deg, var(--mint), var(--accent));
-  box-shadow: 0 8px 18px -8px rgba(30, 122, 98, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #1e7a62;
 }
 
 .glyph svg {
@@ -696,7 +570,7 @@ h1 {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.7), transparent 50%), linear-gradient(140deg, var(--mint), var(--accent));
+  background: #1e7a62 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.6 10.4l2.9 2.9 5.9-6.6' fill='none' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
 }
 
 .chips {
@@ -715,7 +589,7 @@ h1 {
   border: 1px solid var(--card-border);
   box-shadow: var(--shadow);
   font-family: var(--display);
-  font-weight: 650;
+  font-weight: 600;
   font-size: 16px;
 }
 
@@ -758,7 +632,7 @@ h1 {
   list-style: none;
   padding: 16px 0;
   font-family: var(--display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 17.5px;
   display: flex;
   justify-content: space-between;
@@ -807,7 +681,7 @@ h1 {
   align-items: center;
   gap: 6px;
   font-family: var(--display);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .brand-small img {
@@ -822,8 +696,8 @@ h1 {
 
 .js .reveal {
   opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 0.7s ease, transform 0.8s cubic-bezier(0.34, 1.3, 0.64, 1);
+  transform: translateY(12px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
 }
 
 .js .reveal.in {
@@ -835,7 +709,6 @@ h1 {
   html {
     scroll-behavior: auto;
   }
-  .bubble,
   .panel-wrap {
     animation: none;
   }
@@ -845,13 +718,8 @@ h1 {
     transition: none;
   }
   .btn,
-  .card,
   .copy {
     transition: none;
-  }
-  .btn:hover,
-  .card:hover {
-    transform: none;
   }
 }
 
@@ -891,7 +759,7 @@ h1 {
   .features {
     grid-template-columns: minmax(0, 1fr);
   }
-  .proof-bubble {
+  .proof-card {
     grid-template-columns: 1fr;
     gap: 12px;
     padding: 26px 24px;
