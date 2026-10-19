@@ -6,9 +6,13 @@ import SwiftUI
 /// is heading, on a green bubble that floats a few smaller bubbles.
 struct HeroBubble: View {
     let snapshot: Snapshot
-    @State private var shown = false
+    @State private var appeared = false
     @State private var pointer: CGSize = .zero
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.exportRendering) private var exporting
+
+    /// Figures roll up from zero once; an exported image shows them settled.
+    private var shown: Bool { appeared || exporting }
 
     private var month: Snapshot.Month { snapshot.month }
 
@@ -65,9 +69,9 @@ struct HeroBubble: View {
         }
         .onAppear {
             if reduceMotion {
-                shown = true
+                appeared = true
             } else {
-                withAnimation(.spring(response: 0.9, dampingFraction: 0.85).delay(0.05)) { shown = true }
+                withAnimation(.spring(response: 0.9, dampingFraction: 0.85).delay(0.05)) { appeared = true }
             }
         }
         .accessibilityElement(children: .combine)
@@ -180,6 +184,14 @@ struct BudgetRing: View {
     let budget: Snapshot.Budget
     let shown: Bool
 
+    private var caption: String {
+        switch budget.status {
+        case .fine: return "of budget"
+        case .onPaceToExceed: return "heading for \(Format.percent(budget.projectedPct))"
+        case .over: return "over budget"
+        }
+    }
+
     private var color: Color {
         switch budget.status {
         case .fine: return .white
@@ -206,9 +218,12 @@ struct BudgetRing: View {
                     .foregroundStyle(.white)
             }
             .frame(width: 60, height: 60)
-            Text(budget.status == .fine ? "of budget" : "over pace")
+            Text(caption)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.85))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(width: 78)
         }
         .help("\(budget.name): \(Format.usd(budget.mtdUsd)) of \(Format.usd(budget.amountUsd)) this month, heading for \(Format.usd(budget.projectedUsd)) (\(Format.percent(budget.projectedPct))).")
     }

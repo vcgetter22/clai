@@ -150,9 +150,11 @@ struct Rise: ViewModifier {
     let index: Int
     let appeared: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.exportRendering) private var exporting
 
     func body(content: Content) -> some View {
-        content
+        let appeared = self.appeared || exporting
+        return content
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared || reduceMotion ? 0 : 10)
             .scaleEffect(appeared || reduceMotion ? 1 : 0.97, anchor: .top)
@@ -307,8 +309,19 @@ struct ProblemView: View {
 
 // MARK: - Footer
 
+struct MoreGlyph: View {
+    var body: some View {
+        Image(systemName: "ellipsis")
+            .font(.system(size: 12.5, weight: .bold))
+            .frame(width: 28, height: 28)
+            .background(Circle().fill(Color.primary.opacity(0.055)))
+            .contentShape(Circle())
+    }
+}
+
 struct PanelFooter: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.exportRendering) private var exporting
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
@@ -335,30 +348,34 @@ struct PanelFooter: View {
             }
             .buttonStyle(BubbleProminentButtonStyle())
             .help("Open the full dashboard in your browser (served from this Mac at 127.0.0.1)")
-            Menu {
-                Button("Scan now") { Task { await model.refresh() } }
-                    .disabled(model.isDemo)
-                Button("Settings…") { model.page = .settings }
-                Divider()
-                Link("clai website", destination: URL(string: "https://getclai.vercel.app")!)
-                Link("Source on GitHub", destination: URL(string: "https://github.com/vcgetter22/clai")!)
-                Divider()
-                Button("Quit clai") { model.quit() }
-                    .keyboardShortcut("q")
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 12.5, weight: .bold))
-                    .frame(width: 28, height: 28)
-                    .background(Circle().fill(Color.primary.opacity(0.055)))
-                    .contentShape(Circle())
+            if exporting {
+                MoreGlyph()
+            } else {
+                moreMenu
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
         }
         .padding(.horizontal, Metrics.gutter + 2)
         .padding(.top, 10)
         .padding(.bottom, 12)
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button("Scan now") { Task { await model.refresh() } }
+                .disabled(model.isDemo)
+            Button("Settings…") { model.page = .settings }
+            Divider()
+            Link("clai website", destination: URL(string: "https://getclai.vercel.app")!)
+            Link("Source on GitHub", destination: URL(string: "https://github.com/vcgetter22/clai")!)
+            Divider()
+            Button("Quit clai") { model.quit() }
+                .keyboardShortcut("q")
+        } label: {
+            MoreGlyph()
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
     }
 
     private func statusLine(now: Date) -> String {

@@ -70,7 +70,6 @@ final class AppModel {
             snapshot = demo
             status = .ready
             lastUpdated = Date().addingTimeInterval(-90)
-            watchedPaths = demo.scan?.watchPaths ?? []
         }
     }
 

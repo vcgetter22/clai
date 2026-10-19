@@ -89,6 +89,53 @@ private struct BubbleCapsuleBody: View {
     }
 }
 
+// MARK: - Tabs
+
+/// A segmented control whose selection is a green bubble that slides between tabs.
+struct BubbleTabs<Tab: Hashable & Identifiable>: View {
+    let tabs: [Tab]
+    @Binding var selection: Tab
+    let title: (Tab) -> String
+    @Namespace private var namespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(tabs) { tab in
+                let selected = tab == selection
+                Button {
+                    if reduceMotion {
+                        selection = tab
+                    } else {
+                        withAnimation(.spring(response: 0.34, dampingFraction: 0.74)) { selection = tab }
+                    }
+                } label: {
+                    Text(title(tab))
+                        .font(.system(size: 12, weight: selected ? .bold : .medium, design: .rounded))
+                        .foregroundStyle(selected ? Color.white : Color.secondary)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 26)
+                        .background {
+                            if selected {
+                                Capsule()
+                                    .fill(Theme.buttonGradient)
+                                    .overlay(Capsule().fill(LinearGradient(colors: [.white.opacity(0.32), .white.opacity(0)], startPoint: .top, endPoint: .center)).padding(1))
+                                    .shadow(color: Theme.green.opacity(0.35), radius: 4, y: 2)
+                                    .matchedGeometryEffect(id: "selection", in: namespace)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(3)
+        .background(Capsule().fill(Color.primary.opacity(0.06)))
+    }
+}
+
 // MARK: - Small pieces
 
 /// A tag that says what a figure is (basis, comparison, plan).
@@ -128,8 +175,11 @@ struct ProviderDot: View {
 struct ShareBar: View {
     let share: Double
     let color: Color
-    @State private var shown = false
+    @State private var appeared = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.exportRendering) private var exporting
+
+    private var shown: Bool { appeared || exporting }
 
     var body: some View {
         GeometryReader { geometry in
@@ -143,7 +193,7 @@ struct ShareBar: View {
         }
         .frame(height: 4)
         .onAppear {
-            if reduceMotion { shown = true } else { withAnimation(.spring(response: 0.7, dampingFraction: 0.8).delay(0.1)) { shown = true } }
+            if reduceMotion { appeared = true } else { withAnimation(.spring(response: 0.7, dampingFraction: 0.8).delay(0.1)) { appeared = true } }
         }
     }
 }

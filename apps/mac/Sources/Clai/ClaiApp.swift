@@ -80,13 +80,16 @@ enum ExportRenderer {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for (name, scheme) in [("light", ColorScheme.light), ("dark", ColorScheme.dark)] {
             let appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+            let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
             let view = PanelView()
                 .environment(model)
                 .environment(\.exportRendering, true)
                 .environment(\.colorScheme, scheme)
-                .background(scheme == .dark ? Color(hex: 0x1C1F1E) : Color(hex: 0xF4F6F4))
+                .background(shape.fill(scheme == .dark ? Color(hex: 0x1C1F1E) : Color(hex: 0xF4F6F4)))
+                .clipShape(shape)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 2
+            renderer.isOpaque = false
             var image: NSImage?
             if let appearance {
                 appearance.performAsCurrentDrawingAppearance { image = renderer.nsImage }

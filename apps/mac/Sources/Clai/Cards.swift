@@ -89,6 +89,12 @@ struct DailyChartCard: View {
         return bars.min { abs($0.date.timeIntervalSince(selected)) < abs($1.date.timeIntervalSince(selected)) }
     }
 
+    /// A label every 7 days, none in the last few days where it would run off the edge.
+    private var ticks: [Date] {
+        let all = bars
+        return stride(from: 0, to: max(1, all.count - 3), by: 7).map { all[$0].date }
+    }
+
     private var total: Double { snapshot.daily.reduce(0) { $0 + $1.usd } }
     private var peak: Double { snapshot.daily.map(\.usd).max() ?? 0 }
 
@@ -112,7 +118,7 @@ struct DailyChartCard: View {
         .chartYScale(domain: 0...max(1, peak * 1.12))
         .chartXSelection(value: $selected)
         .chartXAxis {
-            AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+            AxisMarks(values: ticks) { _ in
                 AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                     .font(.system(size: 9, weight: .medium, design: .rounded))
             }
@@ -149,13 +155,7 @@ struct BreakdownCard: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 10) {
-            Picker("Breakdown", selection: $model.breakdown) {
-                ForEach(BreakdownTab.allCases) { tab in
-                    Text(title(tab)).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            BubbleTabs(tabs: BreakdownTab.allCases, selection: $model.breakdown, title: title)
             content
         }
         .padding(12)
