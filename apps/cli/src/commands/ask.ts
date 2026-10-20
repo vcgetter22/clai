@@ -4,7 +4,7 @@ import { dim, formatUsd, heading, printJson, table } from '../ui.js';
 
 const SCHEMA = `
 Table events (one row per API request or provider bucket):
-  id TEXT, ts TEXT (ISO UTC), day TEXT (local YYYY-MM-DD), source TEXT (claude-code, codex-cli, gemini-cli, opencode, anthropic-admin, openai-admin, openrouter, cursor-admin, github-copilot, claude-export, chatgpt-export),
+  id TEXT, ts TEXT (ISO UTC), day TEXT (local YYYY-MM-DD), source TEXT (claude-code, claude-cowork, codex-cli, gemini-cli, opencode, anthropic-admin, openai-admin, openrouter, cursor-admin, github-copilot, claude-export, chatgpt-export),
   provider TEXT (anthropic, openai, google, xai, ...), model TEXT (raw id), model_key TEXT (canonical id, NULL if unpriced),
   surface TEXT (api, cli-agent, ide, chat, batch), billing TEXT (api, subscription, unknown), plan TEXT, granularity TEXT (request, message, hour, day),
   actor_key TEXT (email/user id or 'me'), project TEXT, session_id TEXT,

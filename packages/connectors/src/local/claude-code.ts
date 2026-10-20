@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { RawUsageEvent } from '@claii/core';
 import type { ConnectorContext, Detection, LocalConnector, ScanOptions } from '../types.js';
@@ -53,6 +53,40 @@ export function claudeConfigDirs(env: NodeJS.ProcessEnv, home: string): string[]
   return [...new Set(dirs)].filter((d) => existsSync(join(d, 'projects')));
 }
 
+/**
+ * Claude Cowork, the Claude desktop app's agent mode, runs Claude Code with one config folder per
+ * session and writes the same transcripts there:
+ * `<Claude app data>/local-agent-mode-sessions/<org>/<user>/<session>/.claude/projects/...`.
+ */
+export function coworkSessionsRoot(env: NodeJS.ProcessEnv, home: string, platform: NodeJS.Platform = process.platform): string | undefined {
+  if (platform === 'darwin') return join(home, 'Library', 'Application Support', 'Claude', 'local-agent-mode-sessions');
+  if (platform === 'win32' && env['APPDATA']) return join(env['APPDATA'], 'Claude', 'local-agent-mode-sessions');
+  return undefined;
+}
+
+/** The per-session `.claude` folders under the Cowork root that hold transcripts. */
+export function coworkConfigDirs(root: string | undefined): string[] {
+  if (!root) return [];
+  const out: string[] = [];
+  for (const org of subdirectories(root)) {
+    for (const user of subdirectories(org)) {
+      for (const session of subdirectories(user)) {
+        const dir = join(session, '.claude');
+        if (existsSync(join(dir, 'projects'))) out.push(dir);
+      }
+    }
+  }
+  return out;
+}
+
+function subdirectories(dir: string): string[] {
+  try {
+    return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => join(dir, e.name));
+  } catch {
+    return [];
+  }
+}
+
 /** Turn `-Users-me-Projects-foo` back into a readable project label (best effort). */
 export function projectLabelFromDir(dirName: string, cwd?: string): string {
   if (cwd) return basename(cwd) || cwd;
@@ -68,7 +102,13 @@ export function parseAssistantLine(line: string): AssistantLine | null {
   return o;
 }
 
-export function toEvent(o: AssistantLine, opts: { file: string; projectDir: string; plan?: string; identity?: ConnectorContext['identity'] }): RawUsageEvent | null {
+/** Which tool a transcript belongs to; Cowork sessions have no project of their own. */
+export interface TranscriptOrigin {
+  source: 'claude-code' | 'claude-cowork';
+  project?: string;
+}
+
+export function toEvent(o: AssistantLine, opts: { file: string; projectDir: string; plan?: string; identity?: ConnectorContext['identity']; origin?: TranscriptOrigin }): RawUsageEvent | null {
   const u = o.message!.usage!;
   const model = str(o.message!.model) ?? 'unknown';
   const ts = str(o.timestamp);
@@ -86,7 +126,7 @@ export function toEvent(o: AssistantLine, opts: { file: string; projectDir: stri
   const context: RawUsageEvent['context'] = {
     sessionId: str(o.sessionId),
     cwd,
-    project: projectLabelFromDir(basename(opts.projectDir), cwd),
+    project: opts.origin?.project ?? projectLabelFromDir(basename(opts.projectDir), cwd),
     gitBranch: str(o.gitBranch),
     appVersion: str(o.version),
     serviceTier: str(u.service_tier),
@@ -97,7 +137,7 @@ export function toEvent(o: AssistantLine, opts: { file: string; projectDir: stri
   };
   return {
     ts,
-    source: 'claude-code',
+    source: opts.origin?.source ?? 'claude-code',
     provider: 'anthropic',
     model,
     surface: 'cli-agent',
@@ -135,6 +175,69 @@ export function mergeUsageMax(a: RawUsageEvent['usage'], b: RawUsageEvent['usage
   };
 }
 
+/**
+ * Read new usage from the transcripts under each config dir's `projects` folder, resuming at the
+ * saved offset of every file. Shared by Claude Code and Claude Cowork.
+ */
+export async function* scanTranscriptDirs(ctx: ConnectorContext, opts: ScanOptions, dirs: string[], origin: TranscriptOrigin): AsyncGenerator<RawUsageEvent> {
+  const plan = ctx.planFor('anthropic');
+  const seen = new Set<string>();
+  for (const dir of dirs) {
+    const projectsDir = join(dir, 'projects');
+    const files = walk(projectsDir, (n) => n.endsWith('.jsonl'));
+    for (const file of files) {
+      const meta = fileMeta(file);
+      if (!meta) continue;
+      const prev = opts.full ? undefined : readFileState(ctx.state, file);
+      let offset = 0;
+      if (prev && prev.size <= meta.size && prev.offset <= meta.size) offset = prev.offset;
+      if (offset >= meta.size && prev && prev.mtimeMs === meta.mtimeMs) continue; // unchanged
+      if (opts.since && meta.mtimeMs < Date.parse(opts.since) && !prev) {
+        // File last modified before the window; nothing inside can be newer.
+        writeFileState(ctx.state, file, { size: meta.size, mtimeMs: meta.mtimeMs, offset: meta.size });
+        continue;
+      }
+      const projectDir = join(projectsDir, file.slice(projectsDir.length + 1).split('/')[0] ?? '');
+      let end = offset;
+      // Lines of one message arrive consecutively (one per content block). Their usage is identical except
+      // that output_tokens can grow on later lines, so duplicates are merged by taking the maximum per field.
+      let pending: RawUsageEvent | null = null;
+      let pendingKey = '';
+      try {
+        for await (const { line, end: lineEnd } of readLinesFrom(file, offset)) {
+          end = lineEnd;
+          const o = parseAssistantLine(line);
+          if (!o) continue;
+          if (o.isApiErrorMessage) continue;
+          const ev = toEvent(o, { file, projectDir, plan, identity: ctx.identity, origin });
+          if (!ev) continue;
+          if (opts.since && ev.ts < opts.since) continue;
+          const key = ev.naturalKey!.join('');
+          if (pending && key === pendingKey) {
+            pending.usage = mergeUsageMax(pending.usage, ev.usage);
+            continue;
+          }
+          if (pending) {
+            if (!seen.has(pendingKey)) {
+              seen.add(pendingKey);
+              yield pending;
+            }
+          }
+          pending = ev;
+          pendingKey = key;
+        }
+        if (pending && !seen.has(pendingKey)) {
+          seen.add(pendingKey);
+          yield pending;
+        }
+        writeFileState(ctx.state, file, { size: meta.size, mtimeMs: meta.mtimeMs, offset: end });
+      } catch (err) {
+        ctx.log.warn(`${origin.source}: failed reading ${file}: ${(err as Error).message}`);
+      }
+    }
+  }
+}
+
 export const claudeCodeConnector: LocalConnector = {
   kind: 'local',
   id: 'claude-code',
@@ -143,73 +246,43 @@ export const claudeCodeConnector: LocalConnector = {
   async detect(ctx: ConnectorContext): Promise<Detection> {
     const dirs = claudeConfigDirs(ctx.env, ctx.home);
     if (dirs.length === 0) return { found: false, summary: 'No Claude Code transcripts found (~/.claude/projects)', paths: [] };
-    const files = dirs.flatMap((d) => walk(join(d, 'projects'), (n) => n.endsWith('.jsonl')));
+    const projects = dirs.map((d) => join(d, 'projects'));
+    const files = projects.flatMap((p) => walk(p, (n) => n.endsWith('.jsonl')));
     return {
       found: files.length > 0,
-      summary: `${files.length} transcript file${files.length === 1 ? '' : 's'} in ${dirs.map((d) => join(d, 'projects')).join(', ')}`,
-      paths: dirs,
+      summary: `${files.length} transcript file${files.length === 1 ? '' : 's'} in ${projects.join(', ')}`,
+      // The transcripts' folder, not all of ~/.claude, which Claude Code writes to for other reasons all the time.
+      paths: projects,
       details: { files: files.length },
     };
   },
 
-  async *scan(ctx: ConnectorContext, opts: ScanOptions = {}): AsyncGenerator<RawUsageEvent> {
-    const plan = ctx.planFor('anthropic');
-    const dirs = claudeConfigDirs(ctx.env, ctx.home);
-    const seen = new Set<string>();
-    for (const dir of dirs) {
-      const projectsDir = join(dir, 'projects');
-      const files = walk(projectsDir, (n) => n.endsWith('.jsonl'));
-      for (const file of files) {
-        const meta = fileMeta(file);
-        if (!meta) continue;
-        const prev = opts.full ? undefined : readFileState(ctx.state, file);
-        let offset = 0;
-        if (prev && prev.size <= meta.size && prev.offset <= meta.size) offset = prev.offset;
-        if (offset >= meta.size && prev && prev.mtimeMs === meta.mtimeMs) continue; // unchanged
-        if (opts.since && meta.mtimeMs < Date.parse(opts.since) && !prev) {
-          // File last modified before the window; nothing inside can be newer.
-          writeFileState(ctx.state, file, { size: meta.size, mtimeMs: meta.mtimeMs, offset: meta.size });
-          continue;
-        }
-        const projectDir = join(projectsDir, file.slice(projectsDir.length + 1).split('/')[0] ?? '');
-        let end = offset;
-        // Lines of one message arrive consecutively (one per content block). Their usage is identical except
-        // that output_tokens can grow on later lines, so duplicates are merged by taking the maximum per field.
-        let pending: RawUsageEvent | null = null;
-        let pendingKey = '';
-        try {
-          for await (const { line, end: lineEnd } of readLinesFrom(file, offset)) {
-            end = lineEnd;
-            const o = parseAssistantLine(line);
-            if (!o) continue;
-            if (o.isApiErrorMessage) continue;
-            const ev = toEvent(o, { file, projectDir, plan, identity: ctx.identity });
-            if (!ev) continue;
-            if (opts.since && ev.ts < opts.since) continue;
-            const key = ev.naturalKey!.join('');
-            if (pending && key === pendingKey) {
-              pending.usage = mergeUsageMax(pending.usage, ev.usage);
-              continue;
-            }
-            if (pending) {
-              if (!seen.has(pendingKey)) {
-                seen.add(pendingKey);
-                yield pending;
-              }
-            }
-            pending = ev;
-            pendingKey = key;
-          }
-          if (pending && !seen.has(pendingKey)) {
-            seen.add(pendingKey);
-            yield pending;
-          }
-          writeFileState(ctx.state, file, { size: meta.size, mtimeMs: meta.mtimeMs, offset: end });
-        } catch (err) {
-          ctx.log.warn(`claude-code: failed reading ${file}: ${(err as Error).message}`);
-        }
-      }
-    }
+  scan(ctx: ConnectorContext, opts: ScanOptions = {}): AsyncGenerator<RawUsageEvent> {
+    return scanTranscriptDirs(ctx, opts, claudeConfigDirs(ctx.env, ctx.home), { source: 'claude-code' });
+  },
+};
+
+export const claudeCoworkConnector: LocalConnector = {
+  kind: 'local',
+  id: 'claude-cowork',
+  displayName: 'Claude Cowork',
+
+  async detect(ctx: ConnectorContext): Promise<Detection> {
+    const root = coworkSessionsRoot(ctx.env, ctx.home);
+    const dirs = coworkConfigDirs(root);
+    if (!root || dirs.length === 0) return { found: false, summary: 'No Claude Cowork sessions found (Claude app data, local-agent-mode-sessions)', paths: [] };
+    const files = dirs.flatMap((d) => walk(join(d, 'projects'), (n) => n.endsWith('.jsonl')));
+    return {
+      found: files.length > 0,
+      summary: `${files.length} transcript file${files.length === 1 ? '' : 's'} in ${dirs.length} Cowork session${dirs.length === 1 ? '' : 's'} (${root})`,
+      // One root for all sessions, so a new session is noticed too.
+      paths: [root],
+      details: { files: files.length, sessions: dirs.length },
+    };
+  },
+
+  scan(ctx: ConnectorContext, opts: ScanOptions = {}): AsyncGenerator<RawUsageEvent> {
+    return scanTranscriptDirs(ctx, opts, coworkConfigDirs(coworkSessionsRoot(ctx.env, ctx.home)), { source: 'claude-cowork', project: 'Cowork' });
   },
 };
 

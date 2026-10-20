@@ -67,6 +67,7 @@ export function providerLabel(provider: string): string {
 export function sourceLabel(source: string): string {
   const known: Record<string, string> = {
     'claude-code': 'Claude Code',
+    'claude-cowork': 'Claude Cowork',
     'codex-cli': 'Codex CLI',
     'gemini-cli': 'Gemini CLI',
     'anthropic-admin': 'Anthropic Admin API',

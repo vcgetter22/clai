@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CATALOG, finalizeEvent } from '@claii/core';
-import { claudeCodeConnector, parseAssistantLine, toEvent } from './claude-code.js';
+import { claudeCodeConnector, coworkConfigDirs, coworkSessionsRoot, parseAssistantLine, scanTranscriptDirs, toEvent } from './claude-code.js';
 import { noopLogger, type ConnectorContext } from '../types.js';
 
 function memState() {
@@ -157,5 +157,50 @@ describe('claude-code connector scan', () => {
     expect(out).toHaveLength(1);
     expect(out[0]!.usage.output).toBe(1136);
     expect(out[0]!.usage.cacheWrite1h).toBe(77025);
+  });
+});
+
+describe('claude-code detection', () => {
+  it('reports the projects folder as the place to watch, not all of ~/.claude', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'clai-cc3-'));
+    const proj = join(home, '.claude', 'projects', '-Users-me-Projects-x');
+    mkdirSync(proj, { recursive: true });
+    writeFileSync(join(proj, 's.jsonl'), assistantLine() + '\n');
+    const det = await claudeCodeConnector.detect(ctxFor(home));
+    expect(det.paths).toEqual([join(home, '.claude', 'projects')]);
+  });
+});
+
+describe('claude cowork', () => {
+  it('finds the per-session config folders in the Claude app data and labels their usage Cowork', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'clai-cowork-'));
+    const root = coworkSessionsRoot({}, home, 'darwin')!;
+    expect(root).toBe(join(home, 'Library', 'Application Support', 'Claude', 'local-agent-mode-sessions'));
+    expect(coworkSessionsRoot({}, home, 'linux')).toBeUndefined();
+    expect(coworkSessionsRoot({ APPDATA: 'C:\\Users\\me\\AppData\\Roaming' }, home, 'win32')).toContain('local-agent-mode-sessions');
+
+    // Real layout: <org>/<user>/<session>/.claude/projects/<encoded outputs dir>/<id>.jsonl, sub-agents below.
+    const session = join(root, 'org-1', 'user-1', 'local_abc');
+    const proj = join(session, '.claude', 'projects', '-Users-me-Library-Application-Support-Claude-local-agent-mode-sessions-org-1-user-1-local-abc-outputs');
+    mkdirSync(join(proj, 'sess-9', 'subagents'), { recursive: true });
+    writeFileSync(join(proj, 'sess-9.jsonl'), assistantLine({ cwd: join(session, 'outputs'), entrypoint: 'local-agent' }) + '\n');
+    writeFileSync(join(proj, 'sess-9', 'subagents', 'agent-a1.jsonl'), assistantLine({ uuid: 'u5', requestId: 'req_5', message: { ...JSON.parse(assistantLine()).message, id: 'msg_5' } }) + '\n');
+    // Not a session: no .claude/projects inside.
+    mkdirSync(join(root, 'skills-plugin', 'user-1', 'org-1', 'skills'), { recursive: true });
+    writeFileSync(join(session, 'audit.jsonl'), '{"type":"audit"}\n');
+
+    const dirs = coworkConfigDirs(root);
+    expect(dirs).toEqual([join(session, '.claude')]);
+    expect(coworkConfigDirs(join(home, 'missing'))).toEqual([]);
+
+    const ctx = ctxFor(home, 'max_5x');
+    const events: { source: string; context?: { project?: string }; billing: string; naturalKey?: string[] }[] = [];
+    for await (const e of scanTranscriptDirs(ctx, {}, dirs, { source: 'claude-cowork', project: 'Cowork' })) events.push(e);
+    expect(events).toHaveLength(2);
+    expect(events.every((e) => e.source === 'claude-cowork' && e.context?.project === 'Cowork' && e.billing === 'subscription')).toBe(true);
+    // Incremental like Claude Code: a second pass reads nothing.
+    const again: unknown[] = [];
+    for await (const e of scanTranscriptDirs(ctx, {}, dirs, { source: 'claude-cowork', project: 'Cowork' })) again.push(e);
+    expect(again).toHaveLength(0);
   });
 });

@@ -52,6 +52,7 @@ export const PROVIDERS: ProviderId[] = [
 
 export type SourceId =
   | 'claude-code'
+  | 'claude-cowork'
   | 'codex-cli'
   | 'gemini-cli'
   | 'opencode'

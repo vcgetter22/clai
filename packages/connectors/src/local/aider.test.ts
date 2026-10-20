@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CATALOG } from '@claii/core';
-import { aiderConnector, aiderHistoryRoots, findAiderHistoryFiles, parseAiderHistory, turnToEvent } from './aider.js';
+import { aiderConnector, aiderHistoryRoots, aiderSkippedFolders, findAiderHistoryFiles, parseAiderHistory, turnToEvent } from './aider.js';
 import { noopLogger, type ConnectorContext } from '../types.js';
 
 function memState() {
@@ -107,6 +107,18 @@ describe('aiderHistoryRoots / findAiderHistoryFiles', () => {
     expect(files).toHaveLength(2);
   });
 
+  it('never looks inside Desktop, Documents or Downloads on macOS unless AIDER_HISTORY_ROOTS names them', () => {
+    const home = mkdtempSync(join(tmpdir(), 'clai-aider-'));
+    for (const dir of ['Documents', 'Desktop', 'Downloads', 'code']) {
+      mkdirSync(join(home, dir), { recursive: true });
+      writeFileSync(join(home, dir, '.aider.chat.history.md'), SAMPLE);
+    }
+    const mac = aiderSkippedFolders({}, 'darwin');
+    expect(findAiderHistoryFiles([home], mac)).toEqual([join(home, 'code', '.aider.chat.history.md')]);
+    expect(findAiderHistoryFiles([home], aiderSkippedFolders({}, 'linux'))).toHaveLength(4);
+    expect(aiderSkippedFolders({ AIDER_HISTORY_ROOTS: join(home, 'Documents') }, 'darwin').size).toBe(0);
+  });
+
   it('honors AIDER_HISTORY_ROOTS as a comma-separated list', () => {
     const base = mkdtempSync(join(tmpdir(), 'clai-aider-'));
     const rootA = join(base, 'work');
@@ -132,6 +144,7 @@ describe('aider connector scan', () => {
     const det = await aiderConnector.detect(ctx);
     expect(det.found).toBe(true);
     expect(det.details?.['files']).toBe(1);
+    expect(det.paths).toEqual([proj]);
 
     const first: unknown[] = [];
     for await (const e of aiderConnector.scan(ctx)) first.push(e);

@@ -29,6 +29,7 @@ export function providerLabel(provider: string): string {
  */
 const SOURCE_PROVIDERS: Partial<Record<SourceId, ProviderId>> = {
   'claude-code': 'anthropic',
+  'claude-cowork': 'anthropic',
   'anthropic-admin': 'anthropic',
   'anthropic-claude-code': 'anthropic',
   'claude-export': 'anthropic',

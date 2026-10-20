@@ -1,5 +1,5 @@
 import type { SourceId } from '@claii/core';
-import { claudeCodeConnector } from './local/claude-code.js';
+import { claudeCodeConnector, claudeCoworkConnector } from './local/claude-code.js';
 import { codexCliConnector } from './local/codex-cli.js';
 import type { ApiConnector, Connector, ImportConnector, LocalConnector } from './types.js';
 
@@ -10,7 +10,7 @@ import type { ApiConnector, Connector, ImportConnector, LocalConnector } from '.
  * Additional connectors register themselves by pushing into these arrays from their modules
  * (see `local/index.ts`, `api/index.ts`, `import/index.ts`).
  */
-export const localConnectors: LocalConnector[] = [claudeCodeConnector, codexCliConnector];
+export const localConnectors: LocalConnector[] = [claudeCodeConnector, claudeCoworkConnector, codexCliConnector];
 export const apiConnectors: ApiConnector[] = [];
 export const importConnectors: ImportConnector[] = [];
 

@@ -41,8 +41,23 @@ export function aiderHistoryRoots(env: NodeJS.ProcessEnv, home: string): string[
   return [home];
 }
 
-/** `.aider.chat.history.md` files directly in each root, plus one level of subdirectories. */
-export function findAiderHistoryFiles(roots: string[]): string[] {
+/**
+ * Home folders the default search on macOS never looks inside. Desktop, Documents and Downloads are
+ * privacy-protected: one lookup inside them from clai for Mac makes macOS ask "clai would like to
+ * access files in your Documents folder", and the scan waits until someone answers. The others hold
+ * media, apps or system data, not projects. `AIDER_HISTORY_ROOTS` can still name a folder in there.
+ */
+export const MAC_SKIPPED_HOME_FOLDERS: ReadonlySet<string> = new Set(['Desktop', 'Documents', 'Downloads', 'Library', 'Movies', 'Music', 'Pictures', 'Public', 'Applications', '.Trash']);
+
+const NO_SKIPS: ReadonlySet<string> = new Set();
+
+/** Subdirectories of the default root (the home directory) to leave alone. */
+export function aiderSkippedFolders(env: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform): ReadonlySet<string> {
+  return platform === 'darwin' && !env['AIDER_HISTORY_ROOTS']?.trim() ? MAC_SKIPPED_HOME_FOLDERS : NO_SKIPS;
+}
+
+/** `.aider.chat.history.md` files directly in each root, plus one level of subdirectories except `skip`. */
+export function findAiderHistoryFiles(roots: string[], skip: ReadonlySet<string> = NO_SKIPS): string[] {
   const out: string[] = [];
   for (const root of roots) {
     const direct = join(root, '.aider.chat.history.md');
@@ -54,7 +69,7 @@ export function findAiderHistoryFiles(roots: string[]): string[] {
       continue;
     }
     for (const e of entries) {
-      if (!e.isDirectory()) continue;
+      if (!e.isDirectory() || skip.has(e.name)) continue;
       const p = join(root, e.name, '.aider.chat.history.md');
       if (existsSync(p)) out.push(p);
     }
@@ -174,21 +189,22 @@ export const aiderConnector: LocalConnector = {
 
   async detect(ctx: ConnectorContext): Promise<Detection> {
     const roots = aiderHistoryRoots(ctx.env, ctx.home);
-    const files = findAiderHistoryFiles(roots);
+    const files = findAiderHistoryFiles(roots, aiderSkippedFolders(ctx.env));
     return {
       found: files.length > 0,
       summary:
         files.length > 0
           ? `${files.length} .aider.chat.history.md file${files.length === 1 ? '' : 's'} found in ${roots.join(', ')}`
           : `No .aider.chat.history.md files found in ${roots.join(', ')} (set AIDER_HISTORY_ROOTS to search other locations)`,
-      paths: roots,
+      // The project folders, not the roots: watching the whole home directory would wake on every change in it.
+      paths: [...new Set(files.map((f) => dirname(f)))],
       details: { files: files.length },
     };
   },
 
   async *scan(ctx: ConnectorContext, opts: ScanOptions = {}): AsyncGenerator<RawUsageEvent> {
     const roots = aiderHistoryRoots(ctx.env, ctx.home);
-    const files = findAiderHistoryFiles(roots);
+    const files = findAiderHistoryFiles(roots, aiderSkippedFolders(ctx.env));
     for (const file of files) {
       const meta = fileMeta(file);
       if (!meta) continue;
