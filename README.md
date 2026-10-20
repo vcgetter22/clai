@@ -10,7 +10,7 @@
 
 ## clai for Mac
 
-A menu bar app with today's spend next to the clai tally and a panel with the month so far, the forecast, what your plan is worth, a 30-day chart, where the money went and tips. It runs the same engine as the CLI and refreshes a few seconds after your tools write their logs. Usage data stays on your Mac.
+A menu bar app with this month's spend next to the clai tally and a panel with the month so far, the forecast, what your plan is worth, a 30-day chart, where the money went and tips. It runs the same engine as the CLI and refreshes a few seconds after your tools write their logs. Usage data stays on your Mac. Opening clai again (or launching it for the first time) shows the panel in a window too, so it can always be found and quit.
 
 **Download:** https://getclai.vercel.app (Apple silicon and Intel, macOS 14 or later), or from Terminal:
 
@@ -20,10 +20,23 @@ curl -fsSL https://getclai.vercel.app/install.sh | sh
 
 Source and build instructions: [apps/mac](apps/mac/README.md).
 
+## Where clai keeps things
+
+Everything clai writes is in one folder, `~/.clai` (or `$CLAI_HOME`):
+
+- `clai.db`: usage events (token counts, model ids, timestamps, project labels), your plans and budgets, and how far each log file has been read. SQLite; `clai.db-wal` and `clai.db-shm` are its journal files.
+- `credentials.json`: only if you connect a provider's admin API (mode 0600, never copied into the database).
+
+clai for Mac adds the app itself, `/Applications/clai.app` (its Node runtime and the engine are inside the bundle; nothing is installed elsewhere), its settings in `~/Library/Preferences/io.github.vcgetter22.clai.plist`, and a login item if you turn on open at login.
+
+clai only reads, never writes: `~/.claude/projects` (Claude Code), `~/Library/Application Support/Claude/local-agent-mode-sessions` (Cowork in the Claude app), `~/.codex/sessions` (Codex CLI), `~/.gemini` (Gemini CLI), `~/.local/share/opencode` (OpenCode), the extension storage of Cline and Roo Code in VS Code, Cursor and VSCodium, and `.aider.chat.history.md` in your home folder and one level below. On a Mac it never looks inside Desktop, Documents or Downloads, so macOS never asks for folder access (`AIDER_HISTORY_ROOTS` can point Aider's search there). Sessions that run in Anthropic's cloud and chats on claude.ai keep their logs on Anthropic's servers, so clai cannot count them.
+
+To remove clai completely: quit it, then delete `/Applications/clai.app`, `~/.clai` and `~/Library/Preferences/io.github.vcgetter22.clai.plist`.
+
 ## Quick start (command line)
 
 ```bash
-npx @claii/cli scan        # detect Claude Code, Codex CLI, Gemini CLI, OpenCode, Cline, Aider and ingest usage
+npx @claii/cli scan        # detect Claude Code, Cowork, Codex CLI, Gemini CLI, OpenCode, Cline, Aider and ingest usage
 npx @claii/cli report      # totals, forecast, by provider / model / project
 npx @claii/cli insights    # savings opportunities and warnings
 npx @claii/cli dashboard   # local web dashboard at http://127.0.0.1:4321
