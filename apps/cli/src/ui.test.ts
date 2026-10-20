@@ -31,7 +31,8 @@ describe('ui', () => {
 
   it('progress redraws in place on a terminal and clears itself on stop', () => {
     const writes: string[] = [];
-    const p = progress('scanning', { stream: { isTTY: true, write: (s) => writes.push(s) }, intervalMs: 10_000 });
+    // Enabled explicitly: on its own the spinner stays off whenever CI is set, as on GitHub Actions.
+    const p = progress('scanning', { enabled: true, stream: { isTTY: true, write: (s) => writes.push(s) }, intervalMs: 10_000 });
     p.update('scanning claude-code');
     p.stop();
     const text = writes.map(stripAnsi).join('');
