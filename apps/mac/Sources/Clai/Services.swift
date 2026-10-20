@@ -59,6 +59,7 @@ final class Preferences {
         static let refresh = "refreshMinutes"
         static let live = "liveUpdates"
         static let updates = "checkForUpdates"
+        static let introduced = "shownWindowIntro"
     }
 
     private let defaults: UserDefaults
@@ -82,6 +83,11 @@ final class Preferences {
         didSet { defaults.set(checkForUpdates, forKey: Key.updates) }
     }
 
+    /// The window that explains where clai lives has been shown once (on the first launch).
+    var shownWindowIntro: Bool {
+        didSet { defaults.set(shownWindowIntro, forKey: Key.introduced) }
+    }
+
     static let refreshChoices = [1, 5, 15, 30, 60]
 
     init(defaults: UserDefaults = .standard) {
@@ -91,6 +97,7 @@ final class Preferences {
         refreshMinutes = Preferences.refreshChoices.contains(minutes) ? minutes : 5
         liveUpdates = defaults.object(forKey: Key.live) as? Bool ?? true
         checkForUpdates = defaults.object(forKey: Key.updates) as? Bool ?? true
+        shownWindowIntro = defaults.bool(forKey: Key.introduced)
     }
 }
 

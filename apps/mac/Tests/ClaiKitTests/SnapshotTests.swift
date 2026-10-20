@@ -45,6 +45,16 @@ final class SnapshotTests: XCTestCase {
         XCTAssertEqual(s.month.elapsedFraction, 19.0 / 31.0, accuracy: 1e-9)
     }
 
+    func testLastUsageDayIsTheEnginesLocalDay() throws {
+        var s = try Fixture.snapshot()
+        XCTAssertEqual(s.lastUsageDay, "2026-10-19")
+        s.timeZone = "Europe/Zurich"
+        s.events.last = "2026-10-14T22:30:00.000Z"
+        XCTAssertEqual(s.lastUsageDay, "2026-10-15")
+        s.events.last = nil
+        XCTAssertNil(s.lastUsageDay)
+    }
+
     func testRejectsANewerSchema() throws {
         var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Fixture.data()) as? [String: Any])
         json["schema"] = 2

@@ -177,6 +177,16 @@ public struct Snapshot: Codable, Equatable, Sendable {
     public var lastMonthName: String { Format.monthName(lastMonth.key) }
 
     public var foundSources: [Source] { scan?.sources.filter(\.found) ?? [] }
+
+    /// The local day (`YYYY-MM-DD`, in the engine's time zone) of the newest usage on this Mac.
+    public var lastUsageDay: String? {
+        guard let last = events.last, let date = ISODate.parse(last), let zone = TimeZone(identifier: timeZone) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        guard let year = parts.year, let month = parts.month, let day = parts.day else { return nil }
+        return String(format: "%04d-%02d-%02d", year, month, day)
+    }
 }
 
 /// How a figure was arrived at (docs/design-principles.md rule 4).

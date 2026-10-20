@@ -197,7 +197,7 @@ struct WelcomeView: View {
                     }
                 }
                 Text(snapshot.foundSources.isEmpty
-                     ? "Nothing to read yet. Use Claude Code, Codex CLI, Gemini CLI, OpenCode, Cline or Aider and clai picks it up on its own."
+                     ? "Nothing to read yet. Use Claude Code, Cowork, Codex CLI, Gemini CLI, OpenCode, Cline or Aider and clai picks it up on its own."
                      : "Found the logs but no usage in them yet. New sessions show up here within seconds.")
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)

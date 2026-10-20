@@ -12,8 +12,8 @@ struct StatPills: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            StatPill(title: "Today", value: Format.usd(snapshot.today.usd), detail: snapshot.today.usd > 0 ? "\(Format.usd(snapshot.yesterday.usd)) yesterday" : "none on this Mac")
-                .help(snapshot.today.usd > 0 ? "Today's usage by the AI tools on this Mac." : "No AI tool on this Mac has logged usage today. Cloud sessions and claude.ai chats leave no logs here.")
+            StatPill(title: "Today", value: Format.usd(snapshot.today.usd), detail: todayDetail)
+                .help(todayHelp)
             StatPill(title: "7 days", value: Format.usd(snapshot.last7Days.usd), detail: "\(Format.usd(snapshot.last7Days.usd / 7)) a day")
             if let plan = snapshot.plans.first {
                 StatPill(title: "Plan value", value: Format.multiple(plan.multiple), detail: plan.label, accent: true)
@@ -26,6 +26,20 @@ struct StatPills: View {
                 .help("Declare the plan you pay for (Claude Max, ChatGPT Plus, Cursor…) to see what it is worth at list prices.")
             }
         }
+    }
+
+    /// Yesterday's figure, or on a quiet stretch the day this Mac last logged usage, so a $0 day
+    /// never reads like a fault.
+    private var todayDetail: String {
+        if snapshot.today.usd > 0 || snapshot.yesterday.usd > 0 { return "\(Format.usd(snapshot.yesterday.usd)) yesterday" }
+        if let last = snapshot.lastUsageDay, last != snapshot.today.day { return "last use \(Format.dayLabel(last))" }
+        return "none on this Mac"
+    }
+
+    private var todayHelp: String {
+        if snapshot.today.usd > 0 { return "Today's usage by the AI tools on this Mac." }
+        let last = snapshot.lastUsageDay.map { " The last usage logged here was on \(Format.dayLabel($0))." } ?? ""
+        return "No AI tool on this Mac has logged usage today.\(last) Cloud sessions and claude.ai chats leave no logs on this Mac."
     }
 }
 
