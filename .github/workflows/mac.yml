@@ -125,6 +125,8 @@ jobs:
             echo 'curl -fsSL https://getclai.vercel.app/install.sh | sh'
             echo '```'
             echo
+            echo "**Updating.** Run the Terminal command again, or quit clai (right-click its menu bar item → Quit clai) and drag the new copy into Applications; macOS does not replace a running app. Your daily totals carry over."
+            echo
             echo "**SHA-256**"
             echo
             echo '```'

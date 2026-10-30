@@ -20,6 +20,8 @@ clai is not notarized by Apple yet. The first time you open a downloaded copy, m
 
 clai lives in the menu bar. The first launch also opens its panel in a window, and opening clai again always brings that window back, so it can be found even when the menu bar item is hidden behind the camera notch. Quit with ⌘Q in the window or a right click on the menu bar item.
 
+To update, run the Terminal command again (it quits clai and replaces it), or quit clai and drag the new copy into Applications; macOS does not replace a running app. clai 0.4 kept its data in `~/.clai`, which this version does not use.
+
 ## What clai reads
 
 | Tool | Where | What |
