@@ -220,14 +220,16 @@ public enum JSON {
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
-    /// A whole number from any JSON number (or numeric string); 0 otherwise.
+    /// A whole number from any JSON number (or numeric string); 0 otherwise, also for numbers too
+    /// large for a 64-bit integer (a corrupt log must not stop clai).
     public static func int(_ value: Any?) -> Int64 {
+        func whole(_ d: Double) -> Int64 { d.isFinite && abs(d) < 9e18 ? Int64(d) : 0 }
         switch value {
         case let v as Int: return Int64(v)
         case let v as Int64: return v
-        case let v as Double: return v.isFinite ? Int64(v) : 0
-        case let v as NSNumber: return v.int64Value
-        case let v as String: return Int64(v) ?? Int64(Double(v) ?? 0)
+        case let v as Double: return whole(v)
+        case let v as NSNumber: return whole(v.doubleValue)
+        case let v as String: return Int64(v) ?? whole(Double(v) ?? 0)
         default: return 0
         }
     }

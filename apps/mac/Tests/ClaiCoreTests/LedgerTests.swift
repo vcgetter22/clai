@@ -151,3 +151,32 @@ final class SourceStatusTests: XCTestCase {
         XCTAssertEqual(Format.count(1_234, "request"), "1,234 requests")
     }
 }
+
+final class CorruptLogTests: XCTestCase {
+    /// Absurd numbers, wrong types and broken lines in any log must not stop clai.
+    func testGarbageNeverCrashes() {
+        let home = TempHome()
+        var huge = Fixture.claude(id: "msg_huge", input: 1, output: 1)
+        var message = huge["message"] as! [String: Any]
+        message["usage"] = ["input_tokens": 1e300, "output_tokens": -5, "cache_read_input_tokens": "lots",
+                            "cache_creation_input_tokens": 9.3e18, "server_tool_use": ["web_search_requests": 1e30]]
+        huge["message"] = message
+        home.write(".claude/projects/p/s.jsonl", lines([huge, Fixture.claude(id: "msg_ok")]) + "{not json\n" + "\u{0}\u{1}garbage\n")
+        home.write(".claude/projects/p/t.jsonl", lines([Fixture.claude(id: "msg_far", time: "9999-12-31T23:59:59Z")]))
+        home.write(".codex/sessions/2026/10/30/rollout-x.jsonl", lines([
+            ["timestamp": "2026-10-30T09:00:00.000Z", "type": "event_msg",
+             "payload": ["type": "token_count", "info": ["total_token_usage": ["input_tokens": 1e300], "last_token_usage": ["input_tokens": "x", "output_tokens": 1e40]]]],
+        ]))
+        home.write(".gemini/tmp/p/chats/session-1.json", #"{"sessionId":"s","messages":[{"id":"g","timestamp":"2026-10-30T09:00:00Z","type":"gemini","tokens":{"input":-1,"output":1e308,"cached":"?"}}]}"#)
+        home.write(".local/share/opencode/storage/message/s/m.json", #"{"id":"m","role":"assistant","modelID":"x","time":{"created":1e300},"tokens":{"input":1e300}}"#)
+        let scanner = UsageScanner(home: home.path, ledgerURL: nil)
+        let result = scanner.refresh(pricer: Pricer(list: .builtIn), now: Date(timeIntervalSince1970: Timestamp.parse("2026-10-30T12:00:00Z")!), timeZone: utc)
+        XCTAssertGreaterThanOrEqual(result.summary.monthRequests, 1)
+        XCTAssertTrue(result.summary.monthCost.isFinite)
+        XCTAssertNil(Timestamp.fromEpoch(1e300))
+        XCTAssertNil(Timestamp.parse("9999-12-31T23:59:59Z"))
+        XCTAssertEqual(JSON.int(1e300), 0)
+        XCTAssertEqual(Tokens(input: .max).input, Tokens.ceiling)
+        XCTAssertEqual((Tokens(input: .max - 1) + Tokens(input: .max - 1)).input, 2 * Tokens.ceiling)
+    }
+}

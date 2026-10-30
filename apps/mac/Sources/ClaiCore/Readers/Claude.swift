@@ -109,7 +109,7 @@ final class ClaudeParser: LogParser {
         }
 
         let tokens = ClaudeParser.tokens(usage)
-        let searches = Int(usage.object("server_tool_use")?.int("web_search_requests") ?? 0)
+        let searches = Int(min(max(0, usage.object("server_tool_use")?.int("web_search_requests") ?? 0), 10_000))
         if !tokens.isZero || searches > 0 {
             emit(key, UsageEvent(tool: tool, model: model, time: time, tokens: tokens, webSearches: searches,
                                  fast: usage.string("speed") == "fast"))

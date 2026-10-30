@@ -134,7 +134,8 @@ struct Header: View {
             Text("clai")
                 .font(.system(size: 15, weight: .semibold))
             Spacer()
-            if state.scanning && !state.isSample {
+            // Only the first read shows progress; later reads take a moment and update the footer.
+            if state.scanning && !state.hasScanned {
                 ProgressView()
                     .controlSize(.small)
                     .help("Reading your logs")

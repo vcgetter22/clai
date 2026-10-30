@@ -84,17 +84,19 @@ public enum Timestamp {
                 offset = sign * (hh * 3600 + mm * 60)
             }
         }
+        guard (1970...2200).contains(year) else { return nil }
         let days = CivilDate.daysFromCivil(year: year, month: month, day: day)
         let seconds = days * 86_400 + hour * 3600 + minute * 60 + second - offset
         return Double(seconds) + fraction
     }
 
-    /// Unix time in seconds or milliseconds, as some tools write it.
+    /// Unix time in seconds, milliseconds or microseconds, as some tools write it; nil outside the
+    /// years 2000 to 2100.
     public static func fromEpoch(_ value: Double) -> Double? {
         guard value.isFinite, value > 0 else { return nil }
-        if value > 1e14 { return value / 1_000_000 } // microseconds
-        if value > 1e11 { return value / 1000 } // milliseconds
-        return value
+        var seconds = value
+        if value > 1e14 { seconds = value / 1_000_000 } else if value > 1e11 { seconds = value / 1000 }
+        return (946_684_800...4_102_444_800).contains(seconds) ? seconds : nil
     }
 }
 

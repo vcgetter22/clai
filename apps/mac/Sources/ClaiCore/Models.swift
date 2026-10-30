@@ -58,12 +58,16 @@ public struct Tokens: Codable, Hashable, Sendable {
     public var cacheWrite: Int64
     public var cacheWrite1h: Int64
 
+    /// No request has a trillion tokens; a larger count is a corrupt log line, and capping it keeps
+    /// sums far from overflowing.
+    static let ceiling: Int64 = 1_000_000_000_000
+
     public init(input: Int64 = 0, output: Int64 = 0, cacheRead: Int64 = 0, cacheWrite: Int64 = 0, cacheWrite1h: Int64 = 0) {
-        self.input = max(0, input)
-        self.output = max(0, output)
-        self.cacheRead = max(0, cacheRead)
-        self.cacheWrite = max(0, cacheWrite)
-        self.cacheWrite1h = max(0, cacheWrite1h)
+        self.input = min(max(0, input), Tokens.ceiling)
+        self.output = min(max(0, output), Tokens.ceiling)
+        self.cacheRead = min(max(0, cacheRead), Tokens.ceiling)
+        self.cacheWrite = min(max(0, cacheWrite), Tokens.ceiling)
+        self.cacheWrite1h = min(max(0, cacheWrite1h), Tokens.ceiling)
     }
 
     public static let zero = Tokens()
@@ -77,13 +81,13 @@ public struct Tokens: Codable, Hashable, Sendable {
     public var isZero: Bool { total == 0 }
 
     public static func + (lhs: Tokens, rhs: Tokens) -> Tokens {
-        Tokens(
-            input: lhs.input + rhs.input,
-            output: lhs.output + rhs.output,
-            cacheRead: lhs.cacheRead + rhs.cacheRead,
-            cacheWrite: lhs.cacheWrite + rhs.cacheWrite,
-            cacheWrite1h: lhs.cacheWrite1h + rhs.cacheWrite1h
-        )
+        var sum = lhs
+        sum.input = lhs.input.addingReportingOverflow(rhs.input).overflow ? .max : lhs.input + rhs.input
+        sum.output = lhs.output.addingReportingOverflow(rhs.output).overflow ? .max : lhs.output + rhs.output
+        sum.cacheRead = lhs.cacheRead.addingReportingOverflow(rhs.cacheRead).overflow ? .max : lhs.cacheRead + rhs.cacheRead
+        sum.cacheWrite = lhs.cacheWrite.addingReportingOverflow(rhs.cacheWrite).overflow ? .max : lhs.cacheWrite + rhs.cacheWrite
+        sum.cacheWrite1h = lhs.cacheWrite1h.addingReportingOverflow(rhs.cacheWrite1h).overflow ? .max : lhs.cacheWrite1h + rhs.cacheWrite1h
+        return sum
     }
 
     public static func += (lhs: inout Tokens, rhs: Tokens) { lhs = lhs + rhs }

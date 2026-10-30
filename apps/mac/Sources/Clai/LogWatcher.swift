@@ -3,8 +3,10 @@ import CoreServices
 import Foundation
 
 /// Tells when the tools write to their logs, so clai reads them a few seconds later instead of
-/// polling. Watches the tools' folders that exist (FSEvents cannot watch a missing folder; the
-/// list is renewed after every read, so a tool installed later is picked up).
+/// polling. Watches the tools' log folders that exist: FSEvents cannot watch a missing folder, and
+/// watching a parent such as the Claude app's data folder would wake clai for every cache write.
+/// The list is renewed after every read, so a tool used for the first time is picked up by the
+/// next safety read (every 5 minutes).
 final class LogWatcher {
     private var stream: FSEventStreamRef?
     private var paths: [String] = []
@@ -16,18 +18,9 @@ final class LogWatcher {
 
     deinit { stop() }
 
-    /// Watches these folders, or the nearest existing folder above each, inside the home folder.
+    /// Watches the folders that exist (`folders` lists only those) and are safe to read.
     func watch(_ folders: [String]) {
-        let home = FileFinder.userHome
-        var roots = Set<String>()
-        for folder in folders {
-            var path = folder
-            while !FileFinder.isDirectory(path), path.count > home.count + 1 {
-                path = (path as NSString).deletingLastPathComponent
-            }
-            if path.count > home.count + 1, FileFinder.isSafe(path) { roots.insert(path) }
-        }
-        let next = roots.sorted()
+        let next = Set(folders.filter { FileFinder.isDirectory($0) && FileFinder.isSafe($0) }).sorted()
         guard next != paths else { return }
         stop()
         paths = next

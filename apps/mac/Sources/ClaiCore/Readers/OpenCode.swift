@@ -68,7 +68,9 @@ public final class OpenCodeReader: LogReader {
             let tokens = Tokens(input: input, output: output + reasoning, cacheRead: cacheRead, cacheWrite: cacheWrite)
             guard !tokens.isZero, let time = Timestamp.fromEpoch(created) else { return }
             let key = "opencode|\(Int64(created))|\(model)|\(input)|\(output)|\(reasoning)|\(cacheRead)|\(cacheWrite)"
-            emit(key, UsageEvent(tool: .opencode, model: model, time: time, tokens: tokens, loggedCost: cost))
+            // A logged cost is used only when it is a plausible amount for one reply.
+            let logged = cost.flatMap { $0.isFinite && $0 >= 0 && $0 < 100_000 ? $0 : nil }
+            emit(key, UsageEvent(tool: .opencode, model: model, time: time, tokens: tokens, loggedCost: logged))
         }
     }
 }
