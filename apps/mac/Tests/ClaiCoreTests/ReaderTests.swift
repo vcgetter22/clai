@@ -380,6 +380,23 @@ final class GeminiReaderTests: XCTestCase {
 }
 
 final class QwenReaderTests: XCTestCase {
+    func testSubagentsTakeTheirModelFromTheMetaFile() {
+        let home = TempHome()
+        let folder = ".qwen/projects/-Users-me-p/subagents/s1/"
+        home.write(folder + "agent-a1.meta.json", #"{"agentId":"a1","agentType":"general","parentSessionId":"s1","parentAgentId":null,"createdAt":"2026-10-30T09:00:00Z","model":"qwen3.7-plus"}"#)
+        home.write(folder + "agent-a1.jsonl", lines([
+            ["uuid": "x1", "sessionId": "s1", "agentId": "a1", "timestamp": "2026-10-30T09:00:00.000Z", "type": "assistant",
+             "message": ["role": "model", "parts": [["text": "…"]]],
+             "usageMetadata": ["promptTokenCount": 10_000, "cachedContentTokenCount": 8_000, "candidatesTokenCount": 500, "totalTokenCount": 10_500]],
+        ]))
+        home.write(folder + "agent-a1.jsonl.stream", "{}\n")
+        let summary = UsageScanner(home: home.path, readers: [QwenReader()], ledgerURL: nil)
+            .refresh(pricer: Pricer(list: .builtIn), now: Date(timeIntervalSince1970: Timestamp.parse("2026-10-30T12:00:00Z")!), timeZone: utc).summary
+        XCTAssertEqual(summary.monthRequests, 1)
+        XCTAssertEqual(summary.models.first?.model, "qwen3.7-plus")
+        XCTAssertEqual(summary.monthCost, usd((2_000, 0.4), (8_000, 0.04), (500, 1.6)), accuracy: 1e-12)
+    }
+
     func testUsageMetadataAndBranchCopies() {
         let home = TempHome()
         func line(_ uuid: String, prompt: Int, cached: Int, candidates: Int, thoughts: Int, total: Int) -> [String: Any] {

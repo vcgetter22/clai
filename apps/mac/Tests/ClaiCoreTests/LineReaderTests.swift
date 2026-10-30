@@ -95,6 +95,11 @@ final class LineReaderTests: XCTestCase {
         try FileManager.default.createSymbolicLink(atPath: home.path + "/.config/claude", withDestinationPath: "../.dotfiles")
         XCTAssertFalse(FileFinder.isSafe(home.path + "/.config/claude/projects", home: home.path))
         XCTAssertFalse(FileFinder.isSafe(home.path + "/.config/claude", home: home.path))
+        // A link whose target, standardized, is the link again (macOS: /var -> /private/var).
+        try FileManager.default.createDirectory(atPath: home.path + "/private/var", withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: home.path + "/var", withDestinationPath: "private/var")
+        XCTAssertTrue(FileFinder.isSafe(home.path + "/var", home: home.path))
+        XCTAssertTrue(FileFinder.isSafe("/tmp"), "a system link like /tmp -> /private/tmp is fine")
         XCTAssertTrue(FileFinder.isGuarded("/Volumes/USB/x", home: home.path))
         XCTAssertTrue(FileFinder.isGuarded(home.path + "/Library/Mobile Documents/com~apple~CloudDocs", home: home.path))
         XCTAssertFalse(FileFinder.isGuarded(home.path + "/Library/Application Support/Claude", home: home.path))

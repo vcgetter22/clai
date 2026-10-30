@@ -4,6 +4,7 @@ import Foundation
 //   Anthropic  https://platform.claude.com/docs/en/about-claude/pricing
 //   OpenAI     https://developers.openai.com/api/docs/pricing
 //   Google     https://ai.google.dev/gemini-api/docs/pricing
+//   Alibaba    https://www.alibabacloud.com/help/en/model-studio/model-pricing (international, Singapore)
 // apps/site/public/prices.json is the same list (a test keeps them equal). The app fetches it once a
 // day, so a price change or a new model reaches every copy without an app update.
 
@@ -43,6 +44,15 @@ private func gemini(_ id: String, _ name: String, _ input: Double, _ output: Dou
                     long: (Double, Double, Double)? = nil, aliases: [String]? = nil, since: String? = nil) -> ModelPrice {
     let tier = long.map { ModelPrice.LongContext(above: 200_000, rates: rates($0.0, $0.1, read: $0.2)) }
     return ModelPrice(id: id, name: name, aliases: aliases, rates: rates(input, output, read: read), long: tier, since: since)
+}
+
+/// Alibaba Cloud Model Studio, international: a request's whole prompt sets its tier (here: up to
+/// 256K, and above). Qwen Code marks prompts for the explicit cache, whose hits cost 10% of input.
+/// Models with more tiers (qwen3-coder-plus, qwen3-coder-flash, qwen3.7-flash) are left out rather
+/// than priced wrong; the free Qwen OAuth `coder-model` named different models over time.
+private func qwen(_ id: String, _ name: String, _ input: Double, _ output: Double, long: (Double, Double)? = nil) -> ModelPrice {
+    let tier = long.map { ModelPrice.LongContext(above: 256_000, rates: rates($0.0, $0.1, read: $0.0 * 0.1)) }
+    return ModelPrice(id: id, name: name, rates: rates(input, output, read: input * 0.1), long: tier)
 }
 
 extension PriceList {
@@ -127,6 +137,15 @@ extension PriceList {
             gemini("gemini-2.5-flash", "Gemini 2.5 Flash", 0.3, 2.5, read: 0.03),
             gemini("gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite", 0.1, 0.4, read: 0.01),
             gemini("gemini-2.0-flash", "Gemini 2.0 Flash", 0.15, 0.6, read: nil),
+
+            // MARK: Qwen
+            qwen("qwen3.7-max", "Qwen3.7 Max", 2.5, 7.5),
+            qwen("qwen3.7-plus", "Qwen3.7 Plus", 0.4, 1.6, long: (1.2, 4.8)),
+            qwen("qwen3.6-plus", "Qwen3.6 Plus", 0.5, 3, long: (2, 6)),
+            qwen("qwen3.5-plus", "Qwen3.5 Plus", 0.4, 2.4, long: (0.5, 3)),
+            qwen("qwen3.6-flash", "Qwen3.6 Flash", 0.25, 1.5, long: (1, 4)),
+            qwen("qwen3.5-flash", "Qwen3.5 Flash", 0.1, 0.4),
+            qwen("qwen-flash", "Qwen Flash", 0.05, 0.4, long: (0.25, 2)),
         ],
         plans: [
             Plan(id: "claude-pro", vendor: .anthropic, name: "Claude Pro", monthly: 20),

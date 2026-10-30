@@ -98,7 +98,8 @@ public enum FileFinder {
             if info.st_mode & S_IFMT == S_IFLNK {
                 guard let target = try? FileManager.default.destinationOfSymbolicLink(atPath: path) else { return false }
                 let absolute = target.hasPrefix("/") ? target : ((path as NSString).deletingLastPathComponent as NSString).appendingPathComponent(target)
-                guard isSafe((absolute as NSString).standardizingPath, home: home, hops: hops + 1) else { return false }
+                // Not standardized: on macOS that turns `/private/var` back into the link `/var`.
+                guard isSafe(absolute, home: home, hops: hops + 1) else { return false }
             }
         }
         return true

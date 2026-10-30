@@ -5,7 +5,7 @@
 - **Works with** Claude Code, Claude Cowork, Codex (CLI, IDE extension and app), Gemini CLI, Qwen Code and OpenCode.
 - **Local and private.** No account, no telemetry. clai reads token counts, model names and times, never prompts, code or replies.
 - **Honest numbers.** Every request is priced at the list price of the day it ran (cache reads and writes, fast mode, long prompts, web searches included) and labelled *API-equivalent*. With a subscription you pay the plan; the figure shows what the same work would cost on the API.
-- **History that stays.** Claude Code and Gemini CLI delete old logs after 30 days; clai keeps the daily totals.
+- **History that stays.** Claude Code and Gemini CLI delete old logs after 30 days; clai keeps its own totals.
 - **One small app.** Native Swift, a 2 MB download, Apple silicon and Intel, macOS 13 or later.
 
 ## Install
@@ -26,7 +26,7 @@ To update, run the Terminal command again (it quits clai and replaces it), or qu
 
 | Tool | Where | What |
 |---|---|---|
-| Claude Code (CLI, IDE extensions, local sessions of the Claude app) | `~/.claude/projects`, `~/.config/claude/projects` | `message.usage` of assistant lines |
+| Claude Code (CLI, IDE extensions, the Claude app's Code tab) | `~/.claude/projects`, `~/.config/claude/projects`, `~/.claude-*/projects`, `~/Library/Application Support/Claude/claude-code-sessions` | `message.usage` of assistant lines |
 | Claude Cowork | `~/Library/Application Support/Claude/local-agent-mode-sessions` | the same, per session |
 | Codex (CLI, IDE extension, app) | `~/.codex/sessions`, `~/.codex/archived_sessions` | `token_count` events, plan limits |
 | Gemini CLI | `~/.gemini/tmp/*/chats` | `tokens` of model replies |
@@ -45,7 +45,7 @@ To see what clai counts on your Mac:
 
 ## Where clai keeps things
 
-- `~/Library/Application Support/clai/ledger.json`: daily totals per tool and model (token counts and request counts).
+- `~/Library/Application Support/clai/ledger.json`: totals per quarter hour, tool and model (token counts and request counts).
 - `~/Library/Application Support/clai/prices.json`: the latest price list, if a newer one than the app's was fetched.
 - `~/Library/Preferences/io.github.vcgetter22.clai.plist`: your settings.
 

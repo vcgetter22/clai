@@ -6,7 +6,7 @@ The app: a menu bar item with this month's API-equivalent spend, and a panel wit
 - `Sources/ClaiCore` (Foundation only; tests run on macOS and Linux)
   - `Readers/`: one reader per tool (Claude Code and Cowork, Codex, Gemini CLI and Qwen Code, OpenCode). Each lists its files and turns lines or documents into one `UsageEvent` per request, with a key that is the same wherever the tool repeats the request.
   - `Scanner.swift`: finds the files, reads only what changed (appended lines, rewritten documents), keeps one event per request, and updates the ledger.
-  - `Ledger.swift`: daily totals per day, tool, model and price tier in `~/Library/Application Support/clai/ledger.json`; for each day and tool the count with more requests wins, so history outlives deleted logs.
+  - `Ledger.swift`: totals per UTC quarter hour, tool, model and price tier in `~/Library/Application Support/clai/ledger.json`; for each quarter hour and tool the count with more requests wins, so history outlives deleted logs, and days are worked out in whatever time zone the Mac is in.
   - `Pricing.swift`, `Prices.swift`: the price list (dated prices, fast mode, cache writes, long-context tiers) and how logged model ids are matched to it.
   - `Summary.swift`, `Format.swift`, `Report.swift`, `Files.swift`, `Time.swift`, `SampleData.swift`.
 - `Sources/Clai` (macOS): `main.swift`, `AppDelegate` (launch, single instance, window on first launch and reopen), `StatusItemController` (NSStatusItem, popover, right-click menu, window), `AppState` (reads on a serial background queue, settings, daily online check, login item), `LogWatcher` (FSEvents), `PanelView`, `SettingsView`, `Theme`, `Renderer`.

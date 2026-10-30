@@ -89,7 +89,8 @@ final class GeminiParser: LogParser {
 /// `cachedContentTokenCount` inside it, `candidatesTokenCount`, `thoughtsTokenCount`,
 /// `totalTokenCount`). With OpenAI-compatible models the candidates already include the
 /// thoughts, so output is the candidates plus whatever of the total is not prompt or candidates.
-/// `/branch` copies records with their `uuid`, which keys them.
+/// `/branch` copies records with their `uuid`, which keys them. Subagents write
+/// `subagents/<session>/agent-<id>.jsonl` without a model; it is in `agent-<id>.meta.json` beside it.
 public final class QwenReader: LogReader {
     public init() {}
 
@@ -99,13 +100,24 @@ public final class QwenReader: LogReader {
 
     public func files(home: String) -> [String] {
         FileFinder.files(under: home + "/.qwen/projects", maxDepth: 4) { $0.hasSuffix(".jsonl") }
-            .filter { $0.contains("/chats/") }
+            .filter { $0.contains("/chats/") || ($0.contains("/subagents/") && ($0 as NSString).lastPathComponent.hasPrefix("agent-")) }
     }
 
-    public func parser(for path: String, home: String) -> LogParser { QwenParser() }
+    public func parser(for path: String, home: String) -> LogParser {
+        guard path.contains("/subagents/") else { return QwenParser(model: nil) }
+        let meta = String(path.dropLast(".jsonl".count)) + ".meta.json"
+        return QwenParser(model: FileFinder.isSafe(meta) ? JSON.object(atPath: meta)?.string("model") : nil)
+    }
 }
 
 final class QwenParser: LogParser {
+    /// A subagent's model, from its meta file; its records do not name it.
+    let model: String?
+
+    init(model: String?) {
+        self.model = model
+    }
+
     func consume(line: UnsafeRawBufferPointer, emit: (String, UsageEvent) -> Void) {
         guard JSON.contains(line, "\"usageMetadata\""), let object = JSON.object(line),
               object.string("type") == "assistant",
@@ -119,6 +131,6 @@ final class QwenParser: LogParser {
         let tokens = Tokens(input: prompt - cached, output: candidates + extra, cacheRead: cached)
         guard !tokens.isZero else { return }
         let id = object.string("uuid") ?? ((object.string("sessionId") ?? "") + stamp)
-        emit("qwen|" + id, UsageEvent(tool: .qwen, model: object.string("model") ?? "", time: time, tokens: tokens))
+        emit("qwen|" + id, UsageEvent(tool: .qwen, model: object.string("model") ?? model ?? "", time: time, tokens: tokens))
     }
 }

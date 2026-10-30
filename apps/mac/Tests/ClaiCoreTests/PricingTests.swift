@@ -109,6 +109,22 @@ final class PricingTests: XCTestCase {
         XCTAssertEqual(id("claude-opus-4.6"), "claude-opus-4-6")
     }
 
+    func testQwenTiersAndSnapshots() {
+        let plus = pricer.match("qwen3.6-plus-2026-04-02")
+        XCTAssertEqual(plus?.exact, true)
+        let price = plus!.price(on: Day(year: 2026, month: 10, day: 30))
+        let short = Tokens(input: 100_000, output: 1_000, cacheRead: 100_000)
+        let long = Tokens(input: 200_000, output: 1_000, cacheRead: 100_000)
+        XCTAssertFalse(price.isLong(short))
+        XCTAssertTrue(price.isLong(long))
+        XCTAssertEqual(price.cost(of: short, long: false, fast: false), usd((100_000, 0.5), (100_000, 0.05), (1_000, 3)), accuracy: 1e-12)
+        XCTAssertEqual(price.cost(of: long, long: true, fast: false), usd((200_000, 2), (100_000, 0.2), (1_000, 6)), accuracy: 1e-12)
+        XCTAssertEqual(id("qwen/qwen3.7-max"), "qwen3.7-max")
+        XCTAssertEqual(id("qwen3.7-max-preview"), "qwen3.7-max")
+        XCTAssertNil(pricer.match("qwen3-coder-plus"), "four tiers: no price rather than a wrong one")
+        XCTAssertNil(pricer.match("coder-model"))
+    }
+
     func testPlans() {
         XCTAssertEqual(PriceList.builtIn.plans.first { $0.id == "claude-max-5x" }?.monthly, 100)
         XCTAssertTrue(PriceList.builtIn.plans.contains { $0.vendor == .openai })

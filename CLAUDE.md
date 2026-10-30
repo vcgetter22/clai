@@ -10,7 +10,7 @@ AI usage tracker for the Mac: a native menu bar app that reads the usage logs AI
 - CI: `.github/workflows/mac.yml` (macos-26: tests, build, smoke test, screenshots; Linux: core tests). A `mac-v<version>` tag publishes a GitHub release.
 
 ## Layout
-- `apps/mac/Sources/ClaiCore`: Foundation only. `Readers/` (one file per tool), `Scanner` (finds files, reads only what changed, one event per request), `Ledger` (daily totals in `~/Library/Application Support/clai/ledger.json`), `Pricing` + `Prices` (the price list), `Summary`, `Format`, `Report`.
+- `apps/mac/Sources/ClaiCore`: Foundation only. `Readers/` (one file per tool), `Scanner` (finds files, reads only what changed, one event per request), `Ledger` (totals per UTC quarter hour in `~/Library/Application Support/clai/ledger.json`; days follow the Mac's time zone), `Pricing` + `Prices` (the price list), `Summary`, `Format`, `Report`.
 - `apps/mac/Sources/Clai`: the app. `main.swift`, `AppDelegate`, `StatusItemController` (NSStatusItem, popover, window), `AppState` (scheduling, settings, daily online check), `LogWatcher` (FSEvents), SwiftUI views (`PanelView`, `SettingsView`, `Theme`), `Renderer`.
 - `apps/site`: getclai.vercel.app (Vercel project `getclai`, root directory `apps/site`, static files, no build step).
 - `docs/decisions.md`, `docs/design.md`.
