@@ -111,7 +111,7 @@ Admin-key spend (Anthropic, OpenAI, OpenRouter, Cursor, Copilot) is left out:
 Claude's 5-hour and weekly limits have one official local source: the `rate_limits` that Claude Code (2.1.80+) passes to a statusLine command. Reading it would mean wrapping the user's statusLine. That is a possible later step; reading Claude's OAuth usage endpoint is not. Codex writes its limits to its own logs, and clai shows them.
 
 ## 2026-10-30: Distribution without a Developer ID
-- **Build.** One universal app, made by building each architecture and joining them with `lipo`. Needs macOS 13 or later, about 3 MB.
+- **Build.** One universal app, made by building each architecture and joining them with `lipo`. Needs macOS 13 or later; the disk image is under 2 MB.
 - **Signing.** Signed ad hoc until there is a Developer ID; the workflow signs and notarizes as soon as the secrets exist.
 - **Gatekeeper.** The download needs Open Anyway once. `curl … | sh` avoids it (curl does not quarantine) and checks the SHA-256.
 - **Updates.** The update check shows a notice and a download link. Sparkle 2 with EdDSA signatures works without a Developer ID and would make updates one click; it is the next step if updates become frequent.

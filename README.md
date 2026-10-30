@@ -6,7 +6,7 @@
 - **Local and private.** No account, no telemetry. clai reads token counts, model names and times, never prompts, code or replies.
 - **Honest numbers.** Every request is priced at the list price of the day it ran (cache reads and writes, fast mode, long prompts, web searches included) and labelled *API-equivalent*. With a subscription you pay the plan; the figure shows what the same work would cost on the API.
 - **History that stays.** Claude Code and Gemini CLI delete old logs after 30 days; clai keeps the daily totals.
-- **One small app.** Native Swift, about 3 MB, Apple silicon and Intel, macOS 13 or later.
+- **One small app.** Native Swift, a 2 MB download, Apple silicon and Intel, macOS 13 or later.
 
 ## Install
 

@@ -26,9 +26,7 @@ struct SettingsPage: View {
             }
 
             SettingsSection(title: "General") {
-                Toggle("Open clai at login", isOn: Binding(get: { state.launchAtLogin }, set: { state.setLaunchAtLogin($0) }))
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                SwitchRow(title: "Open clai at login", isOn: Binding(get: { state.launchAtLogin }, set: { state.setLaunchAtLogin($0) }))
                     .disabled(!AppVersion.isInApplications)
                 if !AppVersion.isInApplications {
                     Caption("Available once clai is in your Applications folder.")
@@ -40,9 +38,7 @@ struct SettingsPage: View {
                             .font(.system(size: 11))
                     }
                 }
-                Toggle("Check for updates and current prices", isOn: $state.checkOnline)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                SwitchRow(title: "Check for updates and current prices", isOn: $state.checkOnline)
                 Caption("Once a day clai asks getclai.vercel.app for the price list and GitHub for a newer version. Nothing about your usage is sent.")
             }
 
@@ -83,6 +79,24 @@ private struct SettingsSection<Content: View>: View {
                 .foregroundStyle(.secondary)
             content
             if let caption { Caption(caption) }
+        }
+    }
+}
+
+/// A label on the left and a switch on the right.
+private struct SwitchRow: View {
+    let title: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 12.5))
+            Spacer()
+            Toggle(title, isOn: $isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
         }
     }
 }

@@ -120,7 +120,8 @@ final class OpenCodeDatabaseParser: LogParser {
         if tables.contains("session_message") {
             statements.append("SELECT coalesce(json_extract(data, '$.model.id'), json_extract(data, '$.modelID')), \(fields) FROM session_message WHERE type IN ('assistant', 'compaction') AND time_created >= ?1")
         }
-        if tables.contains("message") {
+        // After its move to `session_message`, OpenCode no longer writes the old table: read it once.
+        if tables.contains("message") && (newest == 0 || !tables.contains("session_message")) {
             statements.append("SELECT coalesce(json_extract(data, '$.modelID'), json_extract(data, '$.model.id')), \(fields) FROM message WHERE json_extract(data, '$.role') = 'assistant' AND time_created >= ?1")
         }
         var latest = newest

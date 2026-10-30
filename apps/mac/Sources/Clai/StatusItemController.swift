@@ -179,6 +179,20 @@ final class PanelWindowController: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         Activation.bringForward()
         self.window = window
+        // The panel sizes itself in its first layout passes; center the window once it has.
+        DispatchQueue.main.async { [weak window] in
+            MainActor.assumeIsolated { window?.center() }
+        }
+    }
+
+    /// The window follows the panel's height; keep all of it on screen.
+    func windowDidResize(_ notification: Notification) {
+        guard let window, let screen = window.screen ?? NSScreen.main else { return }
+        let visible = screen.visibleFrame
+        var frame = window.frame
+        if frame.maxY > visible.maxY { frame.origin.y = visible.maxY - frame.height }
+        if frame.minY < visible.minY { frame.origin.y = min(visible.minY, visible.maxY - frame.height) }
+        if frame.origin != window.frame.origin { window.setFrameOrigin(frame.origin) }
     }
 
     func windowWillClose(_ notification: Notification) {

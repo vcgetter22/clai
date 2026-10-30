@@ -148,8 +148,9 @@ final class AppState: ObservableObject {
     func start() {
         guard !isSample else { return }
         refresh()
+        // While a tool writes (every second or so during a session), read at most every 10 seconds.
         watcher = LogWatcher { [weak self] in
-            MainActor.assumeIsolated { self?.refreshSoon(after: 3) }
+            MainActor.assumeIsolated { self?.refreshSoon(after: 10) }
         }
 
         // A safety net in case a change went unnoticed, and the daily online check.
@@ -215,10 +216,15 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Reads in a few seconds. Requests in the meantime join that read, so a tool that writes
+    /// continuously still gets its usage shown every few seconds.
     func refreshSoon(after seconds: Double) {
-        pendingRefresh?.cancel()
+        guard pendingRefresh == nil else { return }
         let work = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated { self?.refresh() }
+            MainActor.assumeIsolated {
+                self?.pendingRefresh = nil
+                self?.refresh()
+            }
         }
         pendingRefresh = work
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)

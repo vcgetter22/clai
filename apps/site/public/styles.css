@@ -398,7 +398,7 @@ h1 {
   margin: 8px 0 0 auto;
   width: min(100%, 368px);
   margin-right: 46px;
-  border-radius: 26px;
+  border-radius: 14px;
   box-shadow: var(--shadow-lift);
   animation: fade-in 0.5s ease both 0.1s;
 }
@@ -407,7 +407,7 @@ h1 {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 26px;
+  border-radius: 14px;
   border: 1px solid var(--card-border);
 }
 
