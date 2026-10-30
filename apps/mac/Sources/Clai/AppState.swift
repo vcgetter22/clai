@@ -357,12 +357,10 @@ final class AppState: ObservableObject {
         let identity = AppState.loginItemIdentity
         let changed = defaults.string(forKey: Keys.loginItemFor) != identity
         DispatchQueue.global(qos: .utility).async {
-            var status = SMAppService.mainApp.status
-            var added = false
-            if status != .enabled && status != .requiresApproval && changed {
-                added = (try? SMAppService.mainApp.register()) != nil
-                status = SMAppService.mainApp.status
-            }
+            let before = SMAppService.mainApp.status
+            let added = before != .enabled && before != .requiresApproval && changed
+                && (try? SMAppService.mainApp.register()) != nil
+            let status = added ? SMAppService.mainApp.status : before
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     if added { self.defaults.set(identity, forKey: Keys.loginItemFor) }

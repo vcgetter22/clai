@@ -30,7 +30,7 @@ To update, run the Terminal command again (it quits clai and replaces it), or qu
 | Claude Cowork | `~/Library/Application Support/Claude/local-agent-mode-sessions` | the same, per session |
 | Codex (CLI, IDE extension, app) | `~/.codex/sessions`, `~/.codex/archived_sessions` | `token_count` events, plan limits |
 | Gemini CLI | `~/.gemini/tmp/*/chats` | `tokens` of model replies |
-| Qwen Code | `~/.qwen/projects/*/chats` | `usageMetadata` of assistant records |
+| Qwen Code | `~/.qwen/projects/*/chats`, `~/.qwen/projects/*/subagents` | `usageMetadata` of assistant records |
 | OpenCode | `~/.local/share/opencode` (`opencode.db` and the older JSON files) | `tokens` and `cost` of assistant messages |
 
 Each request is counted once, even when a tool writes it several times (streamed replies, resumed or forked sessions, archived copies). clai never looks inside Desktop, Documents, Downloads, iCloud Drive or other apps' containers, so macOS never asks for folder access.

@@ -58,6 +58,8 @@ Researched against the tools' source and the open-source trackers (ccusage, Code
 **Qwen Code**
 - Reads `usageMetadata`. Output is the candidates plus whatever of the total is neither prompt nor candidates, so OpenAI-compatible backends, which put thoughts inside the candidates, are not counted twice.
 - Branch copies share a `uuid`.
+- Subagents write `subagents/<session>/agent-<id>.jsonl` without a model; it is read from `agent-<id>.meta.json` beside the file.
+- Prices are Alibaba Cloud's international list prices for the models Qwen Code uses now, with their 256K tier; Qwen Code marks prompts for the explicit cache, whose hits cost 10% of input. Models with more tiers (`qwen3-coder-plus`, retired on 2026-10-10, and `qwen3-coder-flash`) and the free Qwen OAuth `coder-model` (an alias for different models over time, ended 2026-04-15) have no price and show "–".
 
 **OpenCode**
 - Reads `opencode.db`, both the `message` and the `session_message` tables on every read (1.15 to 1.19 have both and still write to `message`), through `json_extract`, plus the older JSON files.
