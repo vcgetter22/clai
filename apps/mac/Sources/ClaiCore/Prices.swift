@@ -7,8 +7,10 @@ import Foundation
 // apps/site/public/prices.json is the same list (a test keeps them equal). The app fetches it once a
 // day, so a price change or a new model reaches every copy without an app update.
 
+/// Rates rounded to a millionth of a dollar, so the published list reads `0.3`, not `0.30000000000000004`.
 private func rates(_ input: Double, _ output: Double, read: Double?, write: Double? = nil, write1h: Double? = nil) -> Rates {
-    Rates(input: input, output: output, cacheRead: read, cacheWrite: write, cacheWrite1h: write1h)
+    func clean(_ value: Double) -> Double { (value * 1_000_000).rounded() / 1_000_000 }
+    return Rates(input: clean(input), output: clean(output), cacheRead: read.map(clean), cacheWrite: write.map(clean), cacheWrite1h: write1h.map(clean))
 }
 
 /// Anthropic: 5-minute cache writes 1.25x input, 1-hour writes 2x, reads 0.1x unless given.

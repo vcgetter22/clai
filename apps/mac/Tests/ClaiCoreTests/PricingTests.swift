@@ -59,7 +59,7 @@ final class PricingTests: XCTestCase {
         let big = Tokens(input: 1000, output: 100, cacheRead: 250_000)
         XCTAssertFalse(sonnet.isLong(small))
         XCTAssertTrue(sonnet.isLong(big))
-        let expected: Double = (1000.0 * 6 + 100.0 * 22.5 + 250_000.0 * 0.6) / 1_000_000
+        let expected: Double = usd((1000.0, 6), (100.0, 22.5), (250_000.0, 0.6))
         XCTAssertEqual(sonnet.cost(of: big, long: true, fast: false), expected, accuracy: 1e-12)
         XCTAssertFalse(pricer.match("claude-opus-4-6")!.prices[0].isLong(big))
     }
@@ -83,7 +83,7 @@ final class PricingTests: XCTestCase {
         XCTAssertEqual(sol.cost(of: t, long: false, fast: false), 14.6, accuracy: 1e-9)
         XCTAssertEqual(sol.cost(of: t, long: false, fast: true), 29.2, accuracy: 1e-9)
         XCTAssertTrue(sol.isLong(Tokens(input: 100_000, cacheRead: 180_000)))
-        XCTAssertEqual(sol.cost(of: t, long: true, fast: false), 4 + 15 + 0.2 + 5, accuracy: 1e-9)
+        XCTAssertEqual(sol.cost(of: t, long: true, fast: false), 24.2, accuracy: 1e-9) // 4 + 15 + 0.20 + 5
         // GPT-5.2 bills cache writes as plain input and has no long-context tier.
         let older = pricer.match("gpt-5.2-codex")!.prices[0]
         XCTAssertEqual(older.cost(of: Tokens(cacheWrite: 1_000_000), long: false, fast: false), 1.75, accuracy: 1e-12)
@@ -122,5 +122,24 @@ final class PricingTests: XCTestCase {
         var broken = PriceList.builtIn
         broken.models[0].rates.input = -1
         XCTAssertNil(PriceList.decode(try JSONEncoder().encode(broken)))
+    }
+}
+
+/// apps/site/public/prices.json is what installed copies fetch once a day. It must be the list the
+/// app is built with: `UPDATE_PRICES_JSON=1 swift test --filter SitePriceList` rewrites it after a
+/// change to Prices.swift.
+final class SitePriceListTests: XCTestCase {
+    func testSitePriceListIsTheBuiltInList() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("site/public/prices.json")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(PriceList.builtIn)
+        if ProcessInfo.processInfo.environment["UPDATE_PRICES_JSON"] == "1" {
+            try (data + Data("\n".utf8)).write(to: url)
+        }
+        let published = try XCTUnwrap(PriceList.decode(try Data(contentsOf: url)), "prices.json does not decode or is not valid")
+        XCTAssertEqual(published, PriceList.builtIn, "run UPDATE_PRICES_JSON=1 swift test --filter SitePriceList")
     }
 }

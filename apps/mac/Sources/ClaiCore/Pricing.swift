@@ -88,7 +88,7 @@ public struct ModelPrice: Codable, Hashable, Sendable {
 
 /// The price list: compiled into the app (`PriceList.builtIn`) and refreshed from
 /// getclai.vercel.app/prices.json when a newer one is published.
-public struct PriceList: Codable, Sendable {
+public struct PriceList: Codable, Sendable, Equatable {
     /// `yyyy-mm-dd` of the last change; a newer date wins.
     public var version: String
     /// USD per 1,000 server-side web searches (Anthropic).

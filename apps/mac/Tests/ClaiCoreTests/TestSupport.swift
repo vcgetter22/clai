@@ -40,3 +40,10 @@ func lines(_ objects: [[String: Any]]) -> String {
 }
 
 let utc = TimeZone(identifier: "UTC")!
+
+/// Dollars for (tokens, USD per million tokens) pairs: `usd((1_000, 5), (200, 25))`.
+func usd(_ parts: (Double, Double)...) -> Double {
+    var total = 0.0
+    for (tokens, rate) in parts { total += tokens * rate }
+    return total / 1_000_000
+}

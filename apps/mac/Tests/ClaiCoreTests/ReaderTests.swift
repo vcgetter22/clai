@@ -85,7 +85,7 @@ final class ClaudeReaderTests: XCTestCase {
         XCTAssertEqual(opus.requests, 1)
         XCTAssertEqual(opus.tokens, 10 + 1136 + 1000 + 200)
         // $5 in, $25 out, $0.50 cache read, $6.25 5m write per million.
-        let expected: Double = (10.0 * 5 + 1136.0 * 25 + 1000.0 * 0.5 + 200.0 * 6.25) / 1_000_000
+        let expected: Double = usd((10.0, 5), (1136.0, 25), (1000.0, 0.5), (200.0, 6.25))
         XCTAssertEqual(opus.cost, expected, accuracy: 1e-12)
         XCTAssertEqual(summary.models.first { $0.model.hasPrefix("claude-sonnet") }?.name, "Claude Sonnet 4.5")
         XCTAssertEqual(result.sources.first { $0.tool == .claudeCode }?.files, 3)
@@ -171,7 +171,7 @@ final class CodexReaderTests: XCTestCase {
         XCTAssertEqual(model.requests, 2)
         XCTAssertEqual(model.tokens, 25_000 + 1_500)
         // Uncached input 7,000 at $2, cached 18,000 at $0.10, output 1,500 at $10 (reasoning inside).
-        let expected: Double = (7_000.0 * 2 + 18_000.0 * 0.1 + 1_500.0 * 10) / 1_000_000
+        let expected: Double = usd((7_000.0, 2), (18_000.0, 0.1), (1_500.0, 10))
         XCTAssertEqual(model.cost, expected, accuracy: 1e-12)
         XCTAssertEqual(result.codexLimits?.primary?.usedPercent, 12.5)
         XCTAssertEqual(result.codexLimits?.primary?.windowMinutes, 300)
@@ -264,7 +264,7 @@ final class GeminiReaderTests: XCTestCase {
         var summary = scanner.refresh(pricer: pricer, now: now, timeZone: utc).summary
         XCTAssertEqual(summary.monthRequests, 2)
         XCTAssertEqual(summary.monthTokens, 2 * (2_000 + 10_000 + 1_200))
-        let one: Double = (2_000.0 * 1.25 + 10_000.0 * 0.125 + 1_200.0 * 10) / 1_000_000
+        let one: Double = usd((2_000.0, 1.25), (10_000.0, 0.125), (1_200.0, 10))
         XCTAssertEqual(summary.monthCost, 2 * one, accuracy: 1e-12)
         var later = GeminiReaderTests.reply
         later["id"] = "g2"
@@ -308,7 +308,7 @@ final class QwenReaderTests: XCTestCase {
             .refresh(pricer: Pricer(list: .builtIn), now: Date(timeIntervalSince1970: Timestamp.parse("2026-10-30T12:00:00Z")!), timeZone: utc).summary
         XCTAssertEqual(summary.monthRequests, 2)
         XCTAssertEqual(summary.monthTokens, 1_150 + 1_100)
-        let expected: Double = (600.0 * 2.5 + 400.0 * 0.25 + 150.0 * 15 + 1_000.0 * 2.5 + 100.0 * 15) / 1_000_000
+        let expected: Double = usd((600.0, 2.5), (400.0, 0.25), (150.0, 15), (1_000.0, 2.5), (100.0, 15))
         XCTAssertEqual(summary.monthCost, expected, accuracy: 1e-12)
     }
 }
@@ -330,7 +330,7 @@ final class OpenCodeReaderTests: XCTestCase {
             .refresh(pricer: Pricer(list: .builtIn), now: Date(timeIntervalSince1970: Timestamp.parse("2026-10-30T12:00:00Z")!), timeZone: utc).summary
         XCTAssertEqual(summary.monthRequests, 2)
         let sonnet = summary.models.first { $0.model == "claude-sonnet-4-5" }!
-        let expected: Double = (100.0 * 3 + 60.0 * 15 + 1000.0 * 0.3) / 1_000_000
+        let expected: Double = usd((100.0, 3), (60.0, 15), (1000.0, 0.3))
         XCTAssertEqual(sonnet.cost, expected, accuracy: 1e-12)
         XCTAssertEqual(sonnet.basis, .listed)
         let local = summary.models.first { $0.model == "some-local-model" }!
