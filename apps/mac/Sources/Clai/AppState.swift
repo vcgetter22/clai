@@ -78,6 +78,8 @@ final class AppState: ObservableObject {
         static let online = "checkOnline"
         static let lastOnline = "lastOnlineCheck"
         static let login = "launchAtLogin"
+        /// The version and place of clai when it last added its login item.
+        static let loginItemFor = "loginItemFor"
         static func plan(_ vendor: Vendor) -> String { "plan." + vendor.rawValue }
     }
 
@@ -109,13 +111,12 @@ final class AppState: ObservableObject {
         self.pricer = pricer
         if sample {
             scanner = nil
-            var days = DayResolver(timeZone: .current)
-            summary = SampleData.summary(today: days.day(at: Date().timeIntervalSince1970), pricer: pricer)
+            summary = SampleData.summary(pricer: pricer)
         } else {
-            let scanner = UsageScanner(home: AppState.home, ledgerURL: AppState.supportFolder.appendingPathComponent("ledger.json"))
-            self.scanner = scanner
-            // What the ledger already knows shows at once; the first read follows.
-            summary = scanner.storedSummary(pricer: pricer)
+            // The ledger is loaded on the scan queue; the first read shows what it knows at once.
+            scanner = UsageScanner(home: AppState.home, ledgerURL: AppState.supportFolder.appendingPathComponent("ledger.json"))
+            var days = DayResolver(timeZone: .current)
+            summary = .empty(today: days.day(at: Date().timeIntervalSince1970))
         }
 
         // Every stored property is set from here on.
@@ -135,11 +136,10 @@ final class AppState: ObservableObject {
         updateTitle()
     }
 
-    /// The newer of the compiled-in price list and the last one fetched from getclai.vercel.app.
+    /// The compiled-in price list, updated by the last one fetched from getclai.vercel.app when
+    /// that is newer.
     static func storedPrices() -> PriceList {
-        if let data = try? Data(contentsOf: pricesFile), let list = PriceList.decode(data), list.version > PriceList.builtIn.version {
-            return list
-        }
+        if let data = try? Data(contentsOf: pricesFile), let list = PriceList.published(data) { return list }
         return .builtIn
     }
 
@@ -207,7 +207,15 @@ final class AppState: ObservableObject {
         scanRunning = true
         scanning = true
         let pricer = self.pricer
+        let firstRead = !hasScanned
         queue.async {
+            if firstRead {
+                // What the ledger already knows, while the logs are read (that can take a few seconds).
+                let stored = scanner.storedSummary(pricer: pricer, now: Date(), timeZone: TimeZone.current)
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated { self.showStored(stored) }
+                }
+            }
             let result = scanner.refresh(pricer: pricer, now: Date(), timeZone: TimeZone.current)
             let folders = scanner.watchedFolders
             DispatchQueue.main.async {
@@ -230,6 +238,12 @@ final class AppState: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
     }
 
+    private func showStored(_ stored: Summary) {
+        guard !hasScanned, stored != summary else { return }
+        summary = stored
+        updateTitle()
+    }
+
     private func finish(_ result: ScanResult, watching folders: [String]) {
         if result.summary != summary { summary = result.summary }
         if result.sources != sources { sources = result.sources }
@@ -250,8 +264,8 @@ final class AppState: ObservableObject {
         var title: String?
         if !summary.isEmpty {
             switch figure {
-            case .month: title = Format.usdShort(summary.monthCost)
-            case .today: title = Format.usdShort(summary.todayCost)
+            case .month: title = Format.usdShort(summary.monthCost, unpriced: summary.monthUnpriced)
+            case .today: title = Format.usdShort(summary.todayCost, unpriced: summary.todayUnpriced)
             case .icon: title = nil
             }
         }
@@ -278,9 +292,11 @@ final class AppState: ObservableObject {
         guard checkOnline, !isSample else { return }
         let last = defaults.double(forKey: Keys.lastOnline)
         guard force || Date().timeIntervalSince1970 - last > 20 * 3600 else { return }
-        defaults.set(Date().timeIntervalSince1970, forKey: Keys.lastOnline)
+        // Marked done only when an answer arrives, so a Mac that starts offline tries again within the hour.
         Online.get(Online.pricesURL) { [weak self] data in
-            guard let self, let list = PriceList.decode(data), list.version > self.priceList.version else { return }
+            guard let self else { return }
+            self.defaults.set(Date().timeIntervalSince1970, forKey: Keys.lastOnline)
+            guard let list = PriceList.published(data), list.version > self.priceList.version else { return }
             try? FileManager.default.createDirectory(at: AppState.supportFolder, withIntermediateDirectories: true)
             try? data.write(to: AppState.pricesFile, options: .atomic)
             self.priceList = list
@@ -300,6 +316,7 @@ final class AppState: ObservableObject {
         do {
             if on {
                 try SMAppService.mainApp.register()
+                defaults.set(AppState.loginItemIdentity, forKey: Keys.loginItemFor)
             } else {
                 try SMAppService.mainApp.unregister()
             }
@@ -328,17 +345,30 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// An update gives clai a new signature, which can drop its login item; put it back.
+    private static var loginItemIdentity: String { AppVersion.current + " " + Bundle.main.bundlePath }
+
+    /// An update or a move can drop the login item; put it back then. A login item the user removed
+    /// in System Settings stays removed.
     private func restoreLoginItem() {
         guard defaults.bool(forKey: Keys.login), AppVersion.isInApplications else {
             readLoginItem()
             return
         }
+        let identity = AppState.loginItemIdentity
+        let changed = defaults.string(forKey: Keys.loginItemFor) != identity
         DispatchQueue.global(qos: .utility).async {
-            let status = SMAppService.mainApp.status
+            var status = SMAppService.mainApp.status
+            var added = false
+            if status != .enabled && status != .requiresApproval && changed {
+                added = (try? SMAppService.mainApp.register()) != nil
+                status = SMAppService.mainApp.status
+            }
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    if status != .enabled && status != .requiresApproval { try? SMAppService.mainApp.register() }
+                    if added { self.defaults.set(identity, forKey: Keys.loginItemFor) }
+                    if status != .enabled && status != .requiresApproval && !changed {
+                        self.defaults.set(false, forKey: Keys.login)
+                    }
                     self.readLoginItem()
                 }
             }

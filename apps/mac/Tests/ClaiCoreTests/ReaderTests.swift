@@ -101,6 +101,83 @@ final class ClaudeReaderTests: XCTestCase {
         XCTAssertEqual(scan(home).summary.monthRequests, 2)
     }
 
+    func testAStreamedGatewayReplyWithoutRequestIdCountsOnce() {
+        let home = TempHome()
+        func line(_ id: String, output: Int, time: String) -> [String: Any] {
+            var line = Fixture.claude(id: id, time: time, output: output)
+            line.removeValue(forKey: "requestId")
+            return line
+        }
+        home.write(".claude/projects/p/s.jsonl", lines([
+            line("gen-1", output: 5, time: "2026-10-30T10:00:00.100Z"),
+            line("gen-1", output: 900, time: "2026-10-30T10:00:03.900Z"), // the same reply, one content block later
+            line("gen-2", output: 50, time: "2026-10-30T10:01:00.000Z"),
+        ]))
+        let summary = scan(home).summary
+        XCTAssertEqual(summary.monthRequests, 2)
+        XCTAssertEqual(summary.monthTokens, 2 * (10 + 1000 + 200) + 900 + 50)
+    }
+
+    func testPromptsRepliesThinkingAndToolInputAreNeverParsed() throws {
+        let secret = #"SECRET "quoted" \\ back\\\\slash é {"usage":{"input_tokens":999999}} [ ] , : \\"#
+        var line = Fixture.claude(id: "msg_s", output: 77)
+        var message = line["message"] as! [String: Any]
+        message["content"] = [
+            ["type": "thinking", "thinking": secret, "signature": secret],
+            ["type": "text", "text": secret],
+            ["type": "tool_use", "id": "toolu_1", "name": "Bash", "input": ["command": secret, "description": secret]],
+        ]
+        line["message"] = message
+        let text = lines([line])
+        let skimmed = try text.utf8CString.withUnsafeBytes { raw in
+            try XCTUnwrap(JSON.metadata(UnsafeRawBufferPointer(rebasing: raw.dropLast(2))))
+        }
+        let kept = String(decoding: skimmed, as: UTF8.self)
+        XCTAssertFalse(kept.contains("SECRET"))
+        XCTAssertFalse(kept.contains("999999"))
+        XCTAssertTrue(kept.contains("msg_s") && kept.contains("claude-opus-4-6") && kept.contains("toolu_1"))
+
+        let home = TempHome()
+        home.write(".claude/projects/p/s.jsonl", text)
+        let summary = scan(home).summary
+        XCTAssertEqual(summary.monthRequests, 1)
+        XCTAssertEqual(summary.monthTokens, 10 + 77 + 1000 + 200)
+
+        // An escaped backslash just before a closing quote ends the string there.
+        let tricky = Array(#"{"text":"a\\","model":"m","n":[1,{"text":"\""}]}"#.utf8)
+        let out = tricky.withUnsafeBytes { JSON.metadata($0) }.map { String(decoding: $0, as: UTF8.self) }
+        XCTAssertEqual(out, #"{"text":"","model":"m","n":[1,{"text":""}]}"#)
+        XCTAssertNil(Array(#"{"text":"never closed}"#.utf8).withUnsafeBytes { JSON.metadata($0) })
+    }
+
+    func testServerSideCompactionIsBilled() {
+        let home = TempHome()
+        var line = Fixture.claude(id: "msg_k", model: "claude-opus-5-5", input: 0, output: 0, read: 0, write5m: 0)
+        var message = line["message"] as! [String: Any]
+        var usage = message["usage"] as! [String: Any]
+        usage["iterations"] = [["type": "compaction", "input_tokens": 180_000, "output_tokens": 3_500],
+                               ["type": "message", "input_tokens": 0, "output_tokens": 0]]
+        message["usage"] = usage
+        line["message"] = message
+        home.write(".claude/projects/p/s.jsonl", lines([line]))
+        let summary = scan(home).summary
+        XCTAssertEqual(summary.monthTokens, 183_500)
+        XCTAssertEqual(summary.monthCost, usd((180_000, 4), (3_500, 20)), accuracy: 1e-9)
+    }
+
+    func testTheClaudeAppsCodeTabAndOtherAccounts() {
+        let home = TempHome()
+        let session = "Library/Application Support/Claude/claude-code-sessions/acct/device/local_1"
+        home.write(session + "/.claude/projects/-Users-me-p/s.jsonl", lines([Fixture.claude(id: "msg_app")]))
+        home.write(session + "/outputs/data.jsonl", lines([Fixture.claude(id: "msg_not_a_transcript")]))
+        home.write(".claude-work/projects/p/s.jsonl", lines([Fixture.claude(id: "msg_work", request: "w")]))
+        home.write(".claude/projects/p/s.jsonl", lines([Fixture.claude(id: "msg_app")])) // the same reply again
+        let result = scan(home)
+        XCTAssertEqual(result.summary.monthRequests, 2)
+        XCTAssertEqual(result.summary.tools.map(\.tool), [.claudeCode])
+        XCTAssertTrue(result.sources.first { $0.tool == .claudeCode }!.folders.contains { $0.hasSuffix("/.claude-work/projects") })
+    }
+
     func testFastModeOneHourCacheWebSearchAndAdvisor() {
         let home = TempHome()
         home.write(".claude/projects/p/s.jsonl", lines([
@@ -137,8 +214,10 @@ final class ClaudeReaderTests: XCTestCase {
         var audit = Fixture.claude(id: "msg_c1")
         audit.removeValue(forKey: "requestId")
         audit["request_id"] = "req_1"
+        audit["_audit_timestamp"] = audit.removeValue(forKey: "timestamp")
         var second = Fixture.claude(id: "msg_c2")
         second["session_id"] = "s"
+        second["_audit_timestamp"] = second.removeValue(forKey: "timestamp")
         let result: [String: Any] = ["type": "result", "total_cost_usd": 12.0, "usage": ["input_tokens": 99_999], "subtype": "success", "message": ["role": "assistant"]]
         home.write(session + "/audit.jsonl", lines([audit, second, result]))
         home.write(session + "/outputs/notes.jsonl", lines([Fixture.claude(id: "msg_not_a_transcript")]))
@@ -220,6 +299,19 @@ final class CodexReaderTests: XCTestCase {
         XCTAssertEqual(summary.models.first?.model, "gpt-6-sol")
         // 100K cache-write tokens inside the input at $2.50 per million, Fast tier at twice the price.
         XCTAssertEqual(summary.monthCost, 0.5, accuracy: 1e-9)
+    }
+
+    func testAResponseCutShortCountsWhatTheTotalGrew() {
+        let home = TempHome()
+        home.write(".codex/sessions/2026/10/30/" + rollout, lines([
+            Fixture.codexTurn(model: "gpt-5"),
+            Fixture.codexTokens(time: "2026-10-30T09:01:00.000Z", total: (10_000, 8_000, 500), last: (10_000, 8_000, 500)),
+            // Stopped at the output limit: Codex adds it to the total and leaves `last` as it was.
+            Fixture.codexTokens(time: "2026-10-30T09:02:00.000Z", total: (13_000, 10_000, 4_500), last: (10_000, 8_000, 500)),
+        ]))
+        let summary = UsageScanner(home: home.path, readers: [CodexReader()], ledgerURL: nil).refresh(pricer: pricer, now: now, timeZone: utc).summary
+        XCTAssertEqual(summary.monthRequests, 2)
+        XCTAssertEqual(summary.monthTokens, 17_500)
     }
 
     func testOlderLogsWithoutLastUsage() {

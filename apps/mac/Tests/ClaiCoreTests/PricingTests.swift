@@ -42,6 +42,11 @@ final class PricingTests: XCTestCase {
         XCTAssertEqual(id("gpt-5.7"), "gpt-5.5")
         XCTAssertEqual(id("gpt-5.5-mini"), "gpt-5.4-mini")
         XCTAssertEqual(id("gemini-3.9-flash"), "gemini-3.8-flash")
+        // `preview` is not part of the family: a Pro release follows the newest Pro, preview or not.
+        XCTAssertEqual(id("gemini-3.1-pro"), "gemini-3.1-pro-preview")
+        XCTAssertEqual(id("gemini-3.5-pro"), "gemini-3.1-pro-preview")
+        XCTAssertEqual(id("gemini-4-pro"), "gemini-3.1-pro-preview")
+        XCTAssertEqual(id("gemini-3.2-flash"), "gemini-3-flash-preview")
         XCTAssertNil(pricer.match("some-local-model"))
         XCTAssertNil(pricer.match(""))
     }
@@ -122,6 +127,38 @@ final class PricingTests: XCTestCase {
         var broken = PriceList.builtIn
         broken.models[0].rates.input = -1
         XCTAssertNil(PriceList.decode(try JSONEncoder().encode(broken)))
+    }
+
+    func testAPublishedListCanAddAndChangeButNotRemoveOrBreak() throws {
+        func published(_ change: (inout PriceList) -> Void) throws -> PriceList? {
+            var list = PriceList.builtIn
+            list.version = "2099-01-01"
+            change(&list)
+            return PriceList.published(try JSONEncoder().encode(list))
+        }
+        // A list that lost every Claude model still prices Claude.
+        let noClaude = try XCTUnwrap(try published { $0.models.removeAll { $0.id.hasPrefix("claude") } })
+        XCTAssertEqual(Pricer(list: noClaude).match("claude-opus-5-5")?.exact, true)
+        // A changed price and a new model come through.
+        let changed = try XCTUnwrap(try published {
+            $0.models[0].rates.output = 99
+            $0.models.append(ModelPrice(id: "brand-new-1", name: "Brand New 1", rates: Rates(input: 1, output: 2)))
+        })
+        XCTAssertEqual(Pricer(list: changed).match(PriceList.builtIn.models[0].id)?.prices.last?.rates.output, 99)
+        XCTAssertNotNil(Pricer(list: changed).match("brand-new-1"))
+        // Numbers that would break the panel are refused.
+        XCTAssertNil(try published { $0.webSearchPer1k = 1e300 })
+        XCTAssertNil(try published { $0.plans[0].monthly = 1e-300 })
+        XCTAssertNil(try published { $0.models[0].long = .init(above: -1, rates: $0.models[0].rates) })
+        // Not newer than the built-in list: not used.
+        var old = PriceList.builtIn
+        old.version = "2000-01-01"
+        XCTAssertNil(PriceList.published(try JSONEncoder().encode(old)))
+        // Formatting never traps, whatever the numbers.
+        XCTAssertEqual(Format.usd(1e300), "–")
+        XCTAssertEqual(Format.usdShort(-1e300), "–")
+        XCTAssertEqual(Format.multiple(1e300), "–")
+        XCTAssertEqual(Format.count(Int.min).isEmpty, false)
     }
 }
 

@@ -83,19 +83,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showWindow(welcome: false)
     }
 
-    /// When clai is already running, a newer copy replaces it; any other copy hands over.
+    /// When clai is already running, this copy replaces it if that one is older, or runs from the
+    /// disk image or Downloads while this one does not (opened again after the move to
+    /// Applications). Otherwise this copy hands over and quits.
     private func handOffToRunningCopy() -> Bool {
         guard let id = Bundle.main.bundleIdentifier else { return false }
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: id)
             .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
         guard !others.isEmpty else { return false }
-        let mine = AppVersion.current
-        let olderOnes = others.filter { other in
-            guard let url = other.bundleURL, let theirs = Bundle(url: url)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else { return false }
-            return SemanticVersion(theirs).map { theirVersion in SemanticVersion(mine).map { $0 > theirVersion } ?? false } ?? false
+        let mine = SemanticVersion(AppVersion.current)
+        let replaceable = others.filter { other in
+            guard let url = other.bundleURL else { return false }
+            if !AppVersion.needsMoving && AppVersion.isTemporary(url.path) { return true }
+            guard let mine, let theirs = Bundle(url: url)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+                  let theirVersion = SemanticVersion(theirs) else { return false }
+            return mine > theirVersion
         }
-        if olderOnes.count == others.count {
-            olderOnes.forEach { $0.terminate() }
+        if replaceable.count == others.count {
+            replaceable.forEach { $0.terminate() }
             return false
         }
         DistributedNotificationCenter.default().postNotificationName(Self.showWindowNotification, object: nil, userInfo: nil, deliverImmediately: true)
@@ -135,9 +140,10 @@ enum AppVersion {
 
     /// macOS runs a downloaded app from a temporary read-only copy until it is moved out of
     /// Downloads ("App Translocation"), and a disk image is read-only too.
-    static var needsMoving: Bool {
-        let path = Bundle.main.bundlePath
-        return path.contains("/AppTranslocation/") || path.hasPrefix("/Volumes/")
+    static var needsMoving: Bool { isTemporary(Bundle.main.bundlePath) }
+
+    static func isTemporary(_ path: String) -> Bool {
+        path.contains("/AppTranslocation/") || path.hasPrefix("/Volumes/")
     }
 
     static var isInApplications: Bool {

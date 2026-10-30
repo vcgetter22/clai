@@ -5,7 +5,7 @@ import Foundation
 public enum Format {
     /// `$0`, `$0.0042`, `$0.042`, `$12.35`, `$1,234`; compact: `$1.2k`, `$12k`.
     public static func usd(_ value: Double, compact: Bool = false) -> String {
-        guard value.isFinite else { return "–" }
+        guard value.isFinite, abs(value) < 1e15 else { return "–" }
         let magnitude = abs(value)
         let sign = value < 0 ? "-" : ""
         if compact && magnitude >= 1000 { return sign + "$" + fixed(magnitude / 1000, magnitude >= 10_000 ? 0 : 1) + "k" }
@@ -16,10 +16,20 @@ public enum Format {
         return sign + "$" + fixed(magnitude, 4)
     }
 
+    /// A total that leaves out requests without a price: `–` rather than `$0` when that is all there is.
+    public static func usd(_ value: Double, unpriced: Int, compact: Bool = false) -> String {
+        unpriced > 0 && abs(value) < 0.00005 ? "–" : usd(value, compact: compact)
+    }
+
+    /// The menu bar form of `usd(_:unpriced:)`.
+    public static func usdShort(_ value: Double, unpriced: Int) -> String {
+        unpriced > 0 && abs(value) < 0.005 ? "–" : usdShort(value)
+    }
+
     /// For the menu bar: whole dollars from $10 (`$42`, `$1,082`), compact from $10,000 (`$12k`),
     /// cents below $10 (`$4.20`).
     public static func usdShort(_ value: Double) -> String {
-        guard value.isFinite else { return "–" }
+        guard value.isFinite, abs(value) < 1e15 else { return "–" }
         let magnitude = abs(value)
         if magnitude >= 10_000 { return usd(value, compact: true) }
         if magnitude >= 10 { return (value < 0 ? "-" : "") + "$" + grouped(Int(magnitude.rounded())) }
@@ -46,7 +56,7 @@ public enum Format {
 
     /// `12.3×`
     public static func multiple(_ value: Double) -> String {
-        guard value.isFinite else { return "–" }
+        guard value.isFinite, abs(value) < 1e15 else { return "–" }
         return (value >= 100 ? grouped(Int(value.rounded())) : fixed(value, 1)) + "×"
     }
 
@@ -99,7 +109,7 @@ public enum Format {
 
     /// `1234567` -> `1,234,567`
     static func grouped(_ value: Int) -> String {
-        let digits = String(abs(value))
+        let digits = String(value.magnitude)
         var out = ""
         for (index, character) in digits.enumerated() {
             if index > 0 && (digits.count - index) % 3 == 0 { out.append(",") }

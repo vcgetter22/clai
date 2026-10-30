@@ -179,7 +179,7 @@ struct MonthCard: View {
             Text("\(Format.monthName(summary.today)) so far")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.85))
-            Text(Format.usd(summary.monthCost))
+            Text(Format.usd(summary.monthCost, unpriced: summary.monthUnpriced))
                 .font(.system(size: 32, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.white)
@@ -190,9 +190,9 @@ struct MonthCard: View {
                 .foregroundStyle(.white.opacity(0.78))
                 .help("What these requests would cost at the vendors' API list prices. With a subscription you pay the plan, not this.")
             HStack(alignment: .firstTextBaseline) {
-                CardFigure(label: "Today", value: summary.todayCost)
+                CardFigure(label: "Today", value: summary.todayCost, unpriced: summary.todayUnpriced)
                 Spacer()
-                CardFigure(label: "Last month", value: summary.lastMonthCost, alignment: .trailing)
+                CardFigure(label: "Last month", value: summary.lastMonthCost, unpriced: summary.lastMonthUnpriced, alignment: .trailing)
             }
             .padding(.top, 6)
         }
@@ -212,6 +212,9 @@ struct MonthCard: View {
         if let projected = summary.projectedMonthCost, projected > summary.monthCost * 1.02 {
             line += " · on pace for \(Format.usd(projected, compact: projected >= 10_000))"
         }
+        if summary.monthUnpriced > 0 {
+            line += " · \(Format.count(summary.monthUnpriced, "request")) without a price"
+        }
         return line
     }
 }
@@ -219,6 +222,7 @@ struct MonthCard: View {
 struct CardFigure: View {
     let label: String
     let value: Double
+    var unpriced = 0
     var alignment: HorizontalAlignment = .leading
 
     var body: some View {
@@ -226,7 +230,7 @@ struct CardFigure: View {
             Text(label)
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
-            Text(Format.usd(value))
+            Text(Format.usd(value, unpriced: unpriced))
                 .font(.system(size: 15, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.white)
@@ -299,7 +303,7 @@ struct Breakdown: View {
                         name: model.name,
                         note: note(for: model.basis),
                         detail: Format.tokens(model.tokens) + " tokens",
-                        cost: model.basis == .unpriced ? "–" : Format.usd(model.cost))
+                        cost: Format.usd(model.cost, unpriced: model.unpricedRequests))
                 }
                 if summary.models.count > 6 {
                     Text("and \(summary.models.count - 6) more")
@@ -310,7 +314,7 @@ struct Breakdown: View {
                 ForEach(summary.tools) { tool in
                     VStack(spacing: 4) {
                         Row(dot: Theme.color(tool.tool), name: tool.tool.name, note: nil,
-                            detail: Format.tokens(tool.tokens) + " tokens", cost: Format.usd(tool.cost))
+                            detail: Format.tokens(tool.tokens) + " tokens", cost: Format.usd(tool.cost, unpriced: tool.unpricedRequests))
                         ShareBar(share: summary.monthCost > 0 ? tool.cost / summary.monthCost : 0, color: Theme.color(tool.tool))
                     }
                 }

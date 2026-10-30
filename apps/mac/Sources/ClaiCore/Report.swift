@@ -11,12 +11,15 @@ public enum Report {
         if s.isEmpty {
             out.append("No usage found.")
         } else {
-            out.append("\(Format.monthName(s.today)) so far: \(Format.usd(s.monthCost)) API-equivalent · today \(Format.usd(s.todayCost)) · last month \(Format.usd(s.lastMonthCost))")
+            out.append("\(Format.monthName(s.today)) so far: \(Format.usd(s.monthCost, unpriced: s.monthUnpriced)) API-equivalent · today \(Format.usd(s.todayCost, unpriced: s.todayUnpriced)) · last month \(Format.usd(s.lastMonthCost, unpriced: s.lastMonthUnpriced))")
             out.append("\(Format.count(s.monthRequests, "request")), \(Format.tokens(s.monthTokens)) tokens this month; last usage \(s.lastUsageDay?.description ?? "none")")
+            if s.monthUnpriced > 0 {
+                out.append("\(Format.count(s.monthUnpriced, "request")) this month have no price and are not in the costs")
+            }
             out.append("")
             out.append("Tools this month")
             for t in s.tools {
-                out.append("  " + pad(t.tool.name, 16) + pad(Format.usd(t.cost), 12, right: true) + pad(Format.tokens(t.tokens), 9, right: true) + " tokens" + "  " + Format.count(t.requests, "request"))
+                out.append("  " + pad(t.tool.name, 16) + pad(Format.usd(t.cost, unpriced: t.unpricedRequests), 12, right: true) + pad(Format.tokens(t.tokens), 9, right: true) + " tokens" + "  " + Format.count(t.requests, "request"))
             }
             out.append("")
             out.append("Models this month")
@@ -28,7 +31,7 @@ public enum Report {
                 case .logged: note = "  (cost as logged by the tool)"
                 case .unpriced: note = "  (no price)"
                 }
-                out.append("  " + pad(m.name, 28) + pad(Format.usd(m.cost), 12, right: true) + pad(Format.tokens(m.tokens), 9, right: true) + " tokens" + note)
+                out.append("  " + pad(m.name, 28) + pad(Format.usd(m.cost, unpriced: m.unpricedRequests), 12, right: true) + pad(Format.tokens(m.tokens), 9, right: true) + " tokens" + note)
             }
         }
         out.append("")

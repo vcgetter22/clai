@@ -11,6 +11,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let openWindow: () -> Void
     private var shownTitle: String?? = .none
     private var monitors: [Any] = []
+    private var observers: [(NotificationCenter, NSObjectProtocol)] = []
 
     init(state: AppState, openWindow: @escaping () -> Void) {
         self.state = state
@@ -39,10 +40,18 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     /// Whether the item is on screen. It can be hidden behind the camera notch when the menu bar is
-    /// full, or not allowed in the menu bar (System Settings, macOS 26).
+    /// full (macOS still calls it visible then), or not allowed in the menu bar (System Settings,
+    /// macOS 26).
     var looksVisible: Bool {
-        guard item.isVisible, let window = item.button?.window, window.frame.width > 0 else { return false }
-        return NSScreen.screens.contains { $0.frame.intersects(window.frame) }
+        guard item.isVisible, let window = item.button?.window, window.frame.width > 0,
+              let screen = NSScreen.screens.first(where: { $0.frame.intersects(window.frame) }) else { return false }
+        // The camera housing is the gap between the two unobscured areas at the top of the screen.
+        if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
+            let notchMinX = screen.frame.minX + left.width
+            let notchMaxX = screen.frame.maxX - right.width
+            if notchMaxX > notchMinX, window.frame.maxX > notchMinX, window.frame.minX < notchMaxX { return false }
+        }
+        return true
     }
 
     func remove() {
@@ -116,16 +125,29 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
-        monitors.forEach { NSEvent.removeMonitor($0) }
-        monitors = []
+        stopWatchingForDismissal()
         popover.contentViewController = nil
     }
 
-    /// The panel closes on a click elsewhere, on Escape, or when another app becomes active. (A
-    /// `.transient` popover closes on the first mouse move in a full-screen space.)
-    private func watchForDismissal() {
+    private func stopWatchingForDismissal() {
         monitors.forEach { NSEvent.removeMonitor($0) }
         monitors = []
+        observers.forEach { center, token in center.removeObserver(token) }
+        observers = []
+    }
+
+    /// The panel closes on a click elsewhere, on Escape, when another app becomes active (⌘Tab) and
+    /// when the Space changes. (A `.transient` popover closes on the first mouse move in a
+    /// full-screen Space.)
+    private func watchForDismissal() {
+        stopWatchingForDismissal()
+        for (center, name) in [(NotificationCenter.default, NSApplication.didResignActiveNotification),
+                               (NSWorkspace.shared.notificationCenter, NSWorkspace.activeSpaceDidChangeNotification)] {
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.closePopover() }
+            }
+            observers.append((center, token))
+        }
         if let outside = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.closePopover() }
         }) {

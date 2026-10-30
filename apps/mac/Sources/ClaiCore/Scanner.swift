@@ -89,23 +89,38 @@ public final class UsageScanner: @unchecked Sendable {
     private var files: [String: FileState] = [:]
     private var events: [String: UsageEvent] = [:]
     private var requestsPerTool: [Tool: Int] = [:]
-    public private(set) var ledger: Ledger
+    /// Read from disk on first use, on the scanner's queue.
+    public private(set) lazy var ledger: Ledger = ledgerURL.map { Ledger.load(from: $0) } ?? Ledger()
+    /// Seconds between writes of the ledger. What is not written yet is still in the logs, which
+    /// the next launch reads again, so a later write loses nothing.
+    public var saveInterval: Double = 300
+    private var unsaved = false
+    private var lastSave: Date?
     private var liveIsDirty = true
     private var lastPrices = ""
     private var lastTimeZone = ""
     private var filesPerTool: [Tool: Int] = [:]
+    /// Per tool, the last change of its oldest log file: the logs hold every request from then on.
+    private var completeSince: [Tool: Double] = [:]
+    private var days = DayResolver(timeZone: TimeZone(identifier: "UTC")!)
 
     public init(home: String, readers: [LogReader] = LogReaders.all, ledgerURL: URL?) {
         self.home = home
         self.readers = readers
         self.ledgerURL = ledgerURL
-        self.ledger = ledgerURL.map { Ledger.load(from: $0) } ?? Ledger()
     }
 
     /// The summary from the stored ledger alone: what the panel shows before the first read.
     public func storedSummary(pricer: Pricer, now: Date = Date(), timeZone: TimeZone = .current) -> Summary {
-        var days = DayResolver(timeZone: timeZone)
-        return Summary.make(ledger: ledger, pricer: pricer, today: days.day(at: now.timeIntervalSince1970))
+        useTimeZone(timeZone)
+        return Summary.make(ledger: ledger, pricer: pricer, now: now.timeIntervalSince1970, days: &days)
+    }
+
+    /// Days are worked out in the time zone the Mac is in now; the resolver caches its offsets.
+    private func useTimeZone(_ timeZone: TimeZone) {
+        if days.timeZone.identifier != timeZone.identifier {
+            days = DayResolver(timeZone: timeZone)
+        }
     }
 
     /// Reads what is new in the logs and returns the up-to-date summary.
@@ -114,21 +129,24 @@ public final class UsageScanner: @unchecked Sendable {
         var changed = false
 
         // Which files exist now, per reader.
-        var wanted: [(path: String, reader: Int)] = []
+        var wanted: [(path: String, reader: Int, tool: Tool)] = []
         var seen = Set<String>()
         filesPerTool = [:]
         for (index, reader) in readers.enumerated() {
             for path in reader.files(home: home) where seen.insert(path).inserted {
-                wanted.append((path, index))
-                filesPerTool[reader.tool(for: path, home: home), default: 0] += 1
+                let tool = reader.tool(for: path, home: home)
+                wanted.append((path, index, tool))
+                filesPerTool[tool, default: 0] += 1
             }
         }
 
         // Which of them changed since the last read.
         var work: [(path: String, state: FileState)] = []
-        for (path, readerIndex) in wanted {
+        var oldest: [Tool: Double] = [:]
+        for (path, readerIndex, tool) in wanted {
             let reader = readers[readerIndex]
             guard let stamp = reader.stamp(of: path) else { continue }
+            oldest[tool] = min(oldest[tool] ?? stamp.modified, stamp.modified)
             if var state = files[path] {
                 if state.stamp == stamp { continue }
                 let mode = reader.mode(for: path)
@@ -174,14 +192,14 @@ public final class UsageScanner: @unchecked Sendable {
             }
         }
 
-        // Re-add up the ledger when the logs, the prices or the time zone changed.
+        // Re-add up the ledger when the logs, the prices or the time zone changed (the zone decides
+        // which day's price applies).
+        completeSince = oldest
+        useTimeZone(timeZone)
         let pricesKey = pricer.list.version + "|\(pricer.list.models.count)"
         if changed || liveIsDirty || pricesKey != lastPrices || timeZone.identifier != lastTimeZone {
-            var days = DayResolver(timeZone: timeZone)
             let live = Ledger.buckets(from: Array(events.values), pricer: pricer, days: &days)
-            if ledger.merge(live: live), let url = ledgerURL {
-                try? ledger.save(to: url)
-            }
+            if ledger.merge(live: live, completeSince: completeSince) { unsaved = true }
             liveIsDirty = false
             lastPrices = pricesKey
             lastTimeZone = timeZone.identifier
@@ -189,8 +207,13 @@ public final class UsageScanner: @unchecked Sendable {
             for event in events.values { requestsPerTool[event.tool, default: 0] += 1 }
         }
 
-        var days = DayResolver(timeZone: timeZone)
-        let summary = Summary.make(ledger: ledger, pricer: pricer, today: days.day(at: now.timeIntervalSince1970))
+        if unsaved, let url = ledgerURL, lastSave.map({ Date().timeIntervalSince($0) >= saveInterval }) ?? true {
+            try? ledger.save(to: url)
+            unsaved = false
+            lastSave = Date()
+        }
+
+        let summary = Summary.make(ledger: ledger, pricer: pricer, now: now.timeIntervalSince1970, days: &days)
         return ScanResult(
             summary: summary,
             sources: sourceStatus(),
@@ -218,7 +241,7 @@ public final class UsageScanner: @unchecked Sendable {
 
     /// The folders every reader looks in, for watching them.
     public var watchedFolders: [String] {
-        readers.flatMap { $0.folders(home: home) }.filter { FileFinder.isDirectory($0) }
+        readers.flatMap { $0.folders(home: home) }.filter { FileFinder.isSafe($0) && FileFinder.isDirectory($0) }
     }
 
     private func sourceStatus() -> [SourceStatus] {

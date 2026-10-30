@@ -47,5 +47,34 @@ final class OpenCodeDatabaseTests: XCTestCase {
         XCTAssertTrue(result.changed)
         XCTAssertEqual(result.summary.monthRequests, 3)
     }
+
+    /// OpenCode 1.15 to 1.19 create `session_message` but keep writing replies to `message`.
+    func testNewRowsInTheOldTableAreReadToo() throws {
+        let home = TempHome()
+        let folder = home.path + "/.local/share/opencode"
+        try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        let path = folder + "/opencode.db"
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(path, &db), SQLITE_OK)
+        func exec(_ sql: String) { XCTAssertEqual(sqlite3_exec(db, sql, nil, nil, nil), SQLITE_OK, sql) }
+        func quoted(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "''") + "'" }
+        exec("CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, time_updated INTEGER, data TEXT)")
+        exec("CREATE TABLE session_message (id TEXT PRIMARY KEY, session_id TEXT, type TEXT, seq INTEGER, time_created INTEGER, time_updated INTEGER, data TEXT)")
+        let first = 1_793_350_000_000, second = 1_793_351_000_000
+        exec("INSERT INTO message VALUES ('m1', 's1', \(first), \(first), \(quoted(reply(model: "gpt-5.2", created: first, input: 100, output: 50, v2: false))))")
+        // A corrupt row: its output does not fit an integer; it must not stop the read.
+        exec("INSERT INTO message VALUES ('m0', 's1', \(first), \(first), \(quoted(#"{"role":"assistant","modelID":"x","time":{"created":\#(first)},"tokens":{"input":1,"output":1e300,"reasoning":10,"cache":{"read":0,"write":0}}}"#)))")
+        sqlite3_close(db)
+
+        let scanner = UsageScanner(home: home.path, readers: [OpenCodeReader()], ledgerURL: nil)
+        let pricer = Pricer(list: .builtIn)
+        let now = Date(timeIntervalSince1970: Timestamp.parse("2026-10-30T12:00:00Z")!)
+        XCTAssertEqual(scanner.refresh(pricer: pricer, now: now, timeZone: utc).summary.monthRequests, 2)
+
+        XCTAssertEqual(sqlite3_open(path, &db), SQLITE_OK)
+        exec("INSERT INTO message VALUES ('m2', 's1', \(second), \(second), \(quoted(reply(model: "gpt-5.2", created: second, input: 300, output: 30, v2: false))))")
+        sqlite3_close(db)
+        XCTAssertEqual(scanner.refresh(pricer: pricer, now: now, timeZone: utc).summary.monthRequests, 3)
+    }
 }
 #endif

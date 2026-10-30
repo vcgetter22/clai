@@ -104,20 +104,22 @@ public struct PriceList: Codable, Sendable, Equatable {
         self.plans = plans
     }
 
-    /// A list that can be trusted: decodes, has models, every rate finite and sane, no model listed
-    /// twice for the same day.
+    /// A list that can be trusted: decodes, has models, every number finite and in a sane range, no
+    /// model listed twice for the same day.
     public var isValid: Bool {
-        guard models.count >= 10, webSearchPer1k.isFinite, webSearchPer1k >= 0 else { return false }
+        guard models.count >= 10, webSearchPer1k.isFinite, webSearchPer1k >= 0, webSearchPer1k < 1_000 else { return false }
         var ids = Set<String>()
         for m in models {
-            guard !m.id.isEmpty, !m.name.isEmpty, m.rates.isValid, m.long?.rates.isValid ?? true,
+            guard !m.id.isEmpty, !m.name.isEmpty, m.rates.isValid,
+                  m.long.map({ $0.rates.isValid && $0.above > 0 }) ?? true,
                   (m.fast ?? 1).isFinite, (m.fast ?? 1) >= 1, (m.fast ?? 1) <= 20,
                   m.since == nil || m.sinceDay != nil,
                   ids.insert(m.id + "@" + (m.since ?? "")).inserted else { return false }
         }
         var planIds = Set<String>()
         for plan in plans {
-            guard !plan.id.isEmpty, plan.monthly.isFinite, plan.monthly > 0, planIds.insert(plan.id).inserted else { return false }
+            guard !plan.id.isEmpty, !plan.name.isEmpty, plan.monthly.isFinite, plan.monthly >= 1, plan.monthly < 100_000,
+                  planIds.insert(plan.id).inserted else { return false }
         }
         return true
     }
@@ -125,6 +127,25 @@ public struct PriceList: Codable, Sendable, Equatable {
     public static func decode(_ data: Data) -> PriceList? {
         guard let list = try? JSONDecoder().decode(PriceList.self, from: data), list.isValid else { return nil }
         return list
+    }
+
+    /// A published list (getclai.vercel.app/prices.json) on top of the built-in one: it adds models
+    /// and changes prices, and a model or plan it leaves out keeps its built-in price. Nil when the
+    /// data is not a valid list or not newer than the built-in one.
+    public static func published(_ data: Data) -> PriceList? {
+        guard let list = decode(data), list.version > builtIn.version else { return nil }
+        return builtIn.overlaid(by: list)
+    }
+
+    func overlaid(by newer: PriceList) -> PriceList {
+        let newIds = Set(newer.models.map { Pricer.normalize($0.id) })
+        let newPlans = Set(newer.plans.map(\.id))
+        return PriceList(
+            version: newer.version,
+            webSearchPer1k: newer.webSearchPer1k,
+            models: newer.models + models.filter { !newIds.contains(Pricer.normalize($0.id)) },
+            plans: newer.plans + plans.filter { !newPlans.contains($0.id) }
+        )
     }
 }
 
@@ -271,6 +292,8 @@ public final class Pricer: @unchecked Sendable {
     /// A model id's family (its words) and version (its numbers):
     /// `claude-opus-4-5` -> (`claude-opus`, [4, 5]); `claude-3-5-sonnet` -> (`claude-sonnet`, [3, 5]);
     /// `gpt-5.2-codex` -> (`gpt-codex`, [5, 2]); `gemini-2.5-flash-lite` -> (`gemini-flash-lite`, [2, 5]).
+    /// Words that do not change the price (`preview`, `latest`) are not part of the family, so
+    /// `gemini-3.1-pro-preview` and `gemini-3.5-pro` are both `gemini-pro`.
     static func family(of id: String) -> (name: String, version: [Int]) {
         var words: [String] = []
         var version: [Int] = []
@@ -279,7 +302,7 @@ public final class Pricer: @unchecked Sendable {
             let numbers = pieces.compactMap { Int($0) }
             if !pieces.isEmpty, numbers.count == pieces.count {
                 version.append(contentsOf: numbers)
-            } else {
+            } else if !priceNeutralWords.contains(String(part)) {
                 words.append(String(part))
             }
         }

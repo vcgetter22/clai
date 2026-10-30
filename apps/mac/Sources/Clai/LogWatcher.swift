@@ -20,7 +20,7 @@ final class LogWatcher {
 
     /// Watches the folders that exist (`folders` lists only those) and are safe to read.
     func watch(_ folders: [String]) {
-        let next = Set(folders.filter { FileFinder.isDirectory($0) && FileFinder.isSafe($0) }).sorted()
+        let next = Set(folders.filter { FileFinder.isSafe($0) && FileFinder.isDirectory($0) }).sorted()
         guard next != paths else { return }
         stop()
         paths = next

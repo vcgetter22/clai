@@ -100,6 +100,26 @@ public enum Timestamp {
     }
 }
 
+/// A quarter of an hour, counted from 1970-01-01 00:00 UTC. Every time zone in use is a whole number
+/// of quarter hours away from UTC, so a quarter hour falls on one calendar day in any time zone. The
+/// ledger stores quarter hours, and days are worked out in whatever time zone the Mac is in.
+public struct Quarter: Hashable, Comparable, Sendable {
+    public let rawValue: Int32
+
+    public init(rawValue: Int32) { self.rawValue = rawValue }
+
+    /// The quarter hour an instant (seconds since 1970) falls in.
+    public init(time: Double) {
+        let index = (time / 900).rounded(.down)
+        rawValue = index.isFinite ? Int32(max(-2e9, min(2e9, index))) : 0
+    }
+
+    /// When the quarter hour starts, in seconds since 1970.
+    public var start: Double { Double(rawValue) * 900 }
+
+    public static func < (lhs: Quarter, rhs: Quarter) -> Bool { lhs.rawValue < rhs.rawValue }
+}
+
 /// Maps instants to calendar days in one time zone, caching the zone's offset per quarter hour
 /// (every offset in use is a multiple of 15 minutes, and so is every change of offset).
 public struct DayResolver {

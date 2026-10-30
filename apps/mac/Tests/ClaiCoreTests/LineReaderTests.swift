@@ -89,6 +89,12 @@ final class LineReaderTests: XCTestCase {
         XCTAssertTrue(FileFinder.isSafe(home.path + "/.gemini", home: home.path))
         XCTAssertTrue(FileFinder.isSafe(home.path + "/.claude/real", home: home.path))
         XCTAssertFalse(FileFinder.isSafe(home.path + "/.missing", home: home.path))
+        // A chain of links that ends in Documents is followed as text and refused.
+        try FileManager.default.createDirectory(atPath: home.path + "/.config", withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: home.path + "/.dotfiles", withDestinationPath: home.path + "/Documents/claude")
+        try FileManager.default.createSymbolicLink(atPath: home.path + "/.config/claude", withDestinationPath: "../.dotfiles")
+        XCTAssertFalse(FileFinder.isSafe(home.path + "/.config/claude/projects", home: home.path))
+        XCTAssertFalse(FileFinder.isSafe(home.path + "/.config/claude", home: home.path))
         XCTAssertTrue(FileFinder.isGuarded("/Volumes/USB/x", home: home.path))
         XCTAssertTrue(FileFinder.isGuarded(home.path + "/Library/Mobile Documents/com~apple~CloudDocs", home: home.path))
         XCTAssertFalse(FileFinder.isGuarded(home.path + "/Library/Application Support/Claude", home: home.path))

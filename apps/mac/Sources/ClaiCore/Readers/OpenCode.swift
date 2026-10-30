@@ -28,8 +28,12 @@ public final class OpenCodeReader: LogReader {
         let folder = OpenCodeReader.dataFolder(home: home)
         var out = FileFinder.files(under: folder + "/storage/message", maxDepth: 2) { $0.hasSuffix(".json") }
         #if canImport(SQLite3)
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? []
-        out += names.filter { $0.hasPrefix("opencode") && $0.hasSuffix(".db") }.sorted().map { folder + "/" + $0 }
+        if FileFinder.isSafe(folder) {
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? []
+            out += names.filter { $0.hasPrefix("opencode") && $0.hasSuffix(".db") }.sorted()
+                .map { folder + "/" + $0 }
+                .filter { FileFinder.isSafe($0) }
+        }
         #endif
         return out
     }
@@ -122,9 +126,10 @@ final class OpenCodeDatabaseParser: LogParser {
         if tables.contains("session_message") {
             statements.append("SELECT coalesce(json_extract(data, '$.model.id'), json_extract(data, '$.modelID')), \(fields) FROM session_message WHERE type IN ('assistant', 'compaction') AND time_created >= ?1")
         }
-        // After its move to `session_message`, OpenCode no longer writes the old table: read it once.
-        if tables.contains("message") && (newest == 0 || !tables.contains("session_message")) {
-            statements.append("SELECT coalesce(json_extract(data, '$.modelID'), json_extract(data, '$.model.id')), \(fields) FROM message WHERE json_extract(data, '$.role') = 'assistant' AND time_created >= ?1")
+        // OpenCode 1.15 to 1.19 have both tables and still write replies to `message`; copies across
+        // the two tables share a key.
+        if tables.contains("message") {
+            statements.append("SELECT coalesce(json_extract(data, '$.modelID'), json_extract(data, '$.model.id')), \(fields) FROM message WHERE time_created >= ?1 AND json_extract(data, '$.role') = 'assistant'")
         }
         var latest = newest
         for sql in statements {
@@ -152,7 +157,9 @@ final class OpenCodeDatabaseParser: LogParser {
         }
 
         func int(_ i: Int32) -> Int64 {
-            sqlite3_column_type(statement, i) == SQLITE_NULL ? 0 : max(0, sqlite3_column_int64(statement, i))
+            guard sqlite3_column_type(statement, i) != SQLITE_NULL else { return 0 }
+            let value = sqlite3_column_int64(statement, i)
+            return value > 0 && value <= Tokens.ceiling ? value : 0
         }
 
         func double(_ i: Int32) -> Double? {

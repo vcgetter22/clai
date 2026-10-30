@@ -30,11 +30,11 @@ final class LedgerTests: XCTestCase {
     }
 
     func testAFreshCountReplacesTheStoredOne() {
-        let day = Day(year: 2026, month: 10, day: 30)
-        let key = BucketKey(day: day, tool: .claudeCode, model: "claude-opus-4-6")
+        let quarter = Quarter(time: Timestamp.parse("2026-10-30T10:00:00Z")!)
+        let key = BucketKey(quarter: quarter, tool: .claudeCode, model: "claude-opus-4-6")
         var ledger = Ledger(buckets: [key: BucketValue(tokens: Tokens(input: 100), requests: 2)])
         // Same requests, priced at a different tier after a price list change: replaced, not added.
-        let longKey = BucketKey(day: day, tool: .claudeCode, model: "claude-opus-4-6", long: true)
+        let longKey = BucketKey(quarter: quarter, tool: .claudeCode, model: "claude-opus-4-6", long: true)
         ledger.merge(live: [longKey: BucketValue(tokens: Tokens(input: 100), requests: 2)])
         XCTAssertEqual(ledger.buckets.count, 1)
         XCTAssertNotNil(ledger.buckets[longKey])
@@ -44,31 +44,139 @@ final class LedgerTests: XCTestCase {
         XCTAssertNil(ledger.buckets[key])
     }
 
-    func testANewReaderVersionRecountsDaysWithLogs() {
-        let day = Day(year: 2026, month: 10, day: 30)
-        let old = Day(year: 2026, month: 8, day: 1)
-        let key = BucketKey(day: day, tool: .codex, model: "gpt-5")
-        let oldKey = BucketKey(day: old, tool: .codex, model: "gpt-5")
-        var ledger = Ledger(buckets: [key: BucketValue(requests: 9), oldKey: BucketValue(requests: 4)], readers: Ledger.readersVersion - 1)
-        ledger.merge(live: [key: BucketValue(requests: 3)])
+    func testANewReaderVersionRecountsWhereTheLogsAreComplete() {
+        let recent = Timestamp.parse("2026-10-30T10:00:00Z")!
+        let key = BucketKey(quarter: Quarter(time: recent), tool: .codex, model: "gpt-5")
+        let oldKey = BucketKey(quarter: Quarter(time: Timestamp.parse("2026-08-01T10:00:00Z")!), tool: .codex, model: "gpt-5")
+        // Logs kept since Oct 1; Sep 28 has a long session's requests left, the others were deleted.
+        let partKey = BucketKey(quarter: Quarter(time: Timestamp.parse("2026-09-28T10:00:00Z")!), tool: .codex, model: "gpt-5")
+        let gone = BucketKey(quarter: Quarter(time: Timestamp.parse("2026-10-20T10:00:00Z")!), tool: .codex, model: "gpt-5")
+        var ledger = Ledger(buckets: [key: BucketValue(requests: 9), oldKey: BucketValue(requests: 4), partKey: BucketValue(requests: 10),
+                                      gone: BucketValue(requests: 2)],
+                            readers: Ledger.readersVersion - 1)
+        ledger.merge(live: [key: BucketValue(requests: 3), partKey: BucketValue(requests: 4)],
+                     completeSince: [.codex: Timestamp.parse("2026-10-01T00:00:00Z")!])
         XCTAssertEqual(ledger.buckets[key]?.requests, 3, "an older reader overcounted: the recount wins")
-        XCTAssertEqual(ledger.buckets[oldKey]?.requests, 4, "days without logs keep their history")
+        XCTAssertNil(ledger.buckets[gone], "complete logs without these requests: an older reader made them up")
+        XCTAssertEqual(ledger.buckets[partKey]?.requests, 10, "before the logs are complete, the larger count stays")
+        XCTAssertEqual(ledger.buckets[oldKey]?.requests, 4, "quarter hours without logs keep their history")
         XCTAssertEqual(ledger.readers, Ledger.readersVersion)
+    }
+
+    func testTimeZoneChangesMoveNothingStored() {
+        let home = TempHome()
+        let ledgerURL = home.url.appendingPathComponent("support/ledger.json")
+        home.write(".claude/projects/p/s.jsonl", lines([
+            Fixture.claude(id: "a", time: "2026-10-29T22:00:00.000Z"), // Oct 30 in Moscow
+            Fixture.claude(id: "b", request: "b", time: "2026-10-30T01:00:00.000Z"),
+            Fixture.claude(id: "c", request: "c", time: "2026-10-28T21:30:00.000Z"), // Oct 29 in Moscow
+        ]))
+        let moscow = TimeZone(identifier: "Europe/Moscow")!
+        let la = TimeZone(identifier: "America/Los_Angeles")!
+        var scanner = UsageScanner(home: home.path, readers: [ClaudeReader()], ledgerURL: ledgerURL)
+        let inUTC = scanner.refresh(pricer: pricer, now: now, timeZone: utc).summary
+        let one = inUTC.monthCost / 3
+        XCTAssertEqual(inUTC.todayCost, one, accuracy: 1e-12)
+        let inMoscow = scanner.refresh(pricer: pricer, now: now, timeZone: moscow).summary
+        XCTAssertEqual(inMoscow.monthRequests, 3)
+        XCTAssertEqual(inMoscow.todayCost, 2 * one, accuracy: 1e-12)
+        XCTAssertEqual(inMoscow.monthCost, inUTC.monthCost, accuracy: 1e-12)
+
+        // A restart in another zone, then home again, with the logs gone: still three requests.
+        scanner = UsageScanner(home: home.path, readers: [ClaudeReader()], ledgerURL: ledgerURL)
+        XCTAssertEqual(scanner.refresh(pricer: pricer, now: now, timeZone: la).summary.monthRequests, 3)
+        home.remove(".claude/projects/p/s.jsonl")
+        scanner = UsageScanner(home: home.path, readers: [ClaudeReader()], ledgerURL: ledgerURL)
+        let back = scanner.refresh(pricer: pricer, now: now, timeZone: utc).summary
+        XCTAssertEqual(back.monthRequests, 3)
+        XCTAssertEqual(back.monthCost, inUTC.monthCost, accuracy: 1e-12)
+        XCTAssertEqual(back.days.map(\.cost), inUTC.days.map(\.cost))
     }
 
     func testSavesAndLoads() throws {
         let home = TempHome()
         let url = home.url.appendingPathComponent("ledger.json")
         let ledger = Ledger(buckets: [
-            BucketKey(day: Day(year: 2026, month: 10, day: 30), tool: .claudeCode, model: "claude-opus-4-6", long: false, fast: true):
+            BucketKey(quarter: Quarter(rawValue: 1_986_000), tool: .claudeCode, model: "claude-opus-4-6", long: false, fast: true):
                 BucketValue(tokens: Tokens(input: 1, output: 2, cacheRead: 3, cacheWrite: 4, cacheWrite1h: 5), requests: 6, webSearches: 7, loggedCost: 0),
-            BucketKey(day: Day(year: 2026, month: 10, day: 29), tool: .opencode, model: "x"):
+            BucketKey(quarter: Quarter(rawValue: 1_985_900), tool: .opencode, model: "x"):
                 BucketValue(tokens: Tokens(output: 9), requests: 1, loggedCost: 0.25),
         ])
         try ledger.save(to: url)
         XCTAssertEqual(Ledger.load(from: url), ledger)
+    }
+
+    func testALedgerThatCannotBeReadIsNeverWrittenOver() throws {
+        let home = TempHome()
+        let url = home.url.appendingPathComponent("ledger.json")
+        let key = BucketKey(quarter: Quarter(rawValue: 1_986_000), tool: .codex, model: "gpt-5")
+
+        // Damaged: kept aside, and clai starts over.
         try Data("not json".utf8).write(to: url)
-        XCTAssertEqual(Ledger.load(from: url).buckets.count, 0, "an unreadable ledger starts over")
+        var ledger = Ledger.load(from: url)
+        XCTAssertEqual(ledger.buckets.count, 0)
+        XCTAssertFalse(ledger.isReadOnly)
+        let aside = try FileManager.default.contentsOfDirectory(atPath: home.path).filter { $0.hasPrefix("ledger-unreadable-") }
+        XCTAssertEqual(aside.count, 1)
+        XCTAssertEqual(try String(contentsOfFile: home.path + "/" + aside[0], encoding: .utf8), "not json")
+
+        // Written by a newer clai: left exactly as it is.
+        let newer = #"{"format":99,"readers":7,"rows":[{"q":1,"x":"something new"}]}"#
+        try Data(newer.utf8).write(to: url)
+        ledger = Ledger.load(from: url)
+        XCTAssertTrue(ledger.isReadOnly)
+        ledger.merge(live: [key: BucketValue(requests: 1)])
+        try ledger.save(to: url)
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), newer)
+    }
+
+    func testRowsOfToolsANewerClaiKnowsSurviveARewrite() throws {
+        let home = TempHome()
+        let url = home.url.appendingPathComponent("ledger.json")
+        let file = #"{"format":2,"readers":1,"rows":[{"q":1986000,"t":"copilot-cli","m":"gpt-6","n":3,"k":{"i":5}},{"q":1986000,"t":"codex","m":"gpt-5","n":2,"k":{"i":7}}]}"#
+        try Data(file.utf8).write(to: url)
+        var ledger = Ledger.load(from: url)
+        XCTAssertEqual(ledger.buckets.count, 1)
+        ledger.merge(live: [BucketKey(quarter: Quarter(rawValue: 1_986_001), tool: .codex, model: "gpt-5"): BucketValue(requests: 1)])
+        try ledger.save(to: url)
+        let saved = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(saved.contains("copilot-cli"))
+        XCTAssertEqual(Ledger.load(from: url).buckets.count, 2)
+    }
+
+    func testRequestsWithoutAPriceAreCountedNotShownAsZero() {
+        let home = TempHome()
+        home.write(".claude/projects/p/s.jsonl", lines([
+            Fixture.claude(id: "a", model: "someone-elses-model", time: "2026-10-30T09:00:00.000Z"),
+            Fixture.claude(id: "b", request: "b", model: "someone-elses-model", time: "2026-10-30T09:30:00.000Z"),
+        ]))
+        let summary = UsageScanner(home: home.path, readers: [ClaudeReader()], ledgerURL: nil)
+            .refresh(pricer: pricer, now: now, timeZone: utc).summary
+        XCTAssertFalse(summary.isEmpty)
+        XCTAssertEqual(summary.monthCost, 0)
+        XCTAssertEqual(summary.monthUnpriced, 2)
+        XCTAssertEqual(summary.todayUnpriced, 2)
+        XCTAssertEqual(summary.tools.first?.unpricedRequests, 2)
+        XCTAssertEqual(summary.models.first?.basis, .unpriced)
+        XCTAssertEqual(Format.usdShort(summary.monthCost, unpriced: summary.monthUnpriced), "–")
+        XCTAssertEqual(Format.usd(summary.monthCost, unpriced: summary.monthUnpriced), "–")
+        XCTAssertEqual(Format.usd(12.5, unpriced: 3), "$12.50", "a priced part shows; the rest is noted")
+        XCTAssertEqual(Format.usdShort(0, unpriced: 0), "$0", "no usage is a known zero")
+    }
+
+    func testAModelsPriceBasisDoesNotDependOnOrder() {
+        // A model clai has no price for, with a logged cost on one day and none on another.
+        let first = BucketKey(quarter: Quarter(time: Timestamp.parse("2026-10-29T10:00:00Z")!), tool: .opencode, model: "free-or-not")
+        let second = BucketKey(quarter: Quarter(time: Timestamp.parse("2026-10-30T10:00:00Z")!), tool: .opencode, model: "free-or-not")
+        for _ in 0..<20 {
+            let ledger = Ledger(buckets: [first: BucketValue(tokens: Tokens(input: 10), requests: 1, loggedCost: 0.5),
+                                          second: BucketValue(tokens: Tokens(input: 10), requests: 1)])
+            var days = DayResolver(timeZone: utc)
+            let model = Summary.make(ledger: ledger, pricer: pricer, now: now.timeIntervalSince1970, days: &days).models[0]
+            XCTAssertEqual(model.basis, .logged)
+            XCTAssertEqual(model.cost, 0.5)
+            XCTAssertEqual(model.unpricedRequests, 1)
+        }
     }
 
     func testSummaryPeriodsInTheUsersTimeZone() {
@@ -119,8 +227,7 @@ final class LedgerTests: XCTestCase {
 
 final class SampleDataTests: XCTestCase {
     func testSampleMonthLooksLikeRealUse() {
-        let today = Day(year: 2026, month: 10, day: 30)
-        let summary = SampleData.summary(today: today)
+        let summary = SampleData.summary(now: Date(timeIntervalSince1970: Timestamp.parse("2026-10-30T12:00:00Z")!), timeZone: utc)
         XCTAssertGreaterThan(summary.monthCost, 300)
         XCTAssertLessThan(summary.monthCost, 5_000)
         XCTAssertEqual(summary.tools.first?.tool, .claudeCode)
@@ -169,6 +276,13 @@ final class CorruptLogTests: XCTestCase {
         ]))
         home.write(".gemini/tmp/p/chats/session-1.json", #"{"sessionId":"s","messages":[{"id":"g","timestamp":"2026-10-30T09:00:00Z","type":"gemini","tokens":{"input":-1,"output":1e308,"cached":"?"}}]}"#)
         home.write(".local/share/opencode/storage/message/s/m.json", #"{"id":"m","role":"assistant","modelID":"x","time":{"created":1e300},"tokens":{"input":1e300}}"#)
+        // Counts that fit a 64-bit integer alone but not added up.
+        home.write(".gemini/tmp/p/chats/session-2.jsonl", #"{"id":"g2","timestamp":"2026-10-30T09:00:00Z","type":"gemini","model":"gemini-2.5-pro","tokens":{"input":1,"output":5000000000000000000,"thoughts":5000000000000000000}}"# + "\n")
+        home.write(".qwen/projects/p/chats/s.jsonl", #"{"uuid":"q","sessionId":"s","timestamp":"2026-10-30T09:00:00Z","type":"assistant","model":"m","usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":5000000000000000000,"thoughtsTokenCount":5000000000000000000}}"# + "\n")
+        home.write(".codex/sessions/2026/10/30/rollout-y.jsonl", lines([
+            ["timestamp": "2026-10-30T09:00:00.000Z", "type": "event_msg",
+             "payload": ["type": "token_count", "info": ["total_token_usage": ["input_tokens": 5e18, "cached_input_tokens": -5e18, "output_tokens": 1]]]],
+        ]))
         let scanner = UsageScanner(home: home.path, ledgerURL: nil)
         let result = scanner.refresh(pricer: Pricer(list: .builtIn), now: Date(timeIntervalSince1970: Timestamp.parse("2026-10-30T12:00:00Z")!), timeZone: utc)
         XCTAssertGreaterThanOrEqual(result.summary.monthRequests, 1)
@@ -176,6 +290,10 @@ final class CorruptLogTests: XCTestCase {
         XCTAssertNil(Timestamp.fromEpoch(1e300))
         XCTAssertNil(Timestamp.parse("9999-12-31T23:59:59Z"))
         XCTAssertEqual(JSON.int(1e300), 0)
+        XCTAssertEqual(JSON.int(5e18), 0)
+        XCTAssertEqual(JSON.int(-5), 0)
+        XCTAssertEqual(JSON.int(1234), 1234)
+        XCTAssertEqual(JSON.int("1234"), 1234)
         XCTAssertEqual(Tokens(input: .max).input, Tokens.ceiling)
         XCTAssertEqual((Tokens(input: .max - 1) + Tokens(input: .max - 1)).input, 2 * Tokens.ceiling)
     }

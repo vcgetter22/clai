@@ -56,6 +56,8 @@ public final class CodexReader: LogReader {
     /// session does not log them.
     func configDefaults(home: String) -> (model: String?, tier: String?) {
         let path = home + "/.codex/config.toml"
+        // A config.toml linked from a guarded folder (Documents, iCloud Drive) is not read.
+        guard FileFinder.isSafe(path) else { return (nil, nil) }
         let stamp = FileStamp.of(path)
         if stamp == config.stamp { return (config.model, config.tier) }
         var model: String?
@@ -114,11 +116,14 @@ final class CodexParser: LogParser {
         }
 
         var text: String { "\(input).\(cached).\(cacheWrite).\(output).\(reasoning).\(total)" }
+
+        static let zero = Counts(input: 0, cached: 0, cacheWrite: 0, output: 0, reasoning: 0, total: 0)
     }
 
     private var model: String
     private var tier: String?
     private var lastTotal: Counts?
+    private var lastLast: Counts?
     private(set) var latestLimits: RateLimits?
 
     init(defaultModel: String?, defaultTier: String?) {
@@ -154,16 +159,21 @@ final class CodexParser: LogParser {
         guard let info = payload.object("info") else { return }
         let total = info.object("total_token_usage").map(Counts.init)
         let last = info.object("last_token_usage").map(Counts.init)
-        defer { if let total { lastTotal = total } }
+        defer {
+            if let total { lastTotal = total }
+            if let last { lastLast = last }
+        }
         if let total, total == lastTotal { return } // repeated without new usage
 
         let usage: Counts
-        if let last {
+        if let last, last != lastLast || total == nil {
             // An estimate after compaction or a context-window fill has no input or output.
             guard last.input > 0 || last.output > 0 else { return }
             usage = last
         } else if let total {
-            usage = total.minus(lastTotal ?? Counts(input: 0, cached: 0, cacheWrite: 0, output: 0, reasoning: 0, total: 0))
+            // Older logs have no `last`; and a response cut short (output limit, interrupted
+            // compaction) moves the total but leaves `last` as it was: what the total grew by.
+            usage = total.minus(lastTotal ?? .zero)
             guard usage.input > 0 || usage.output > 0 else { return }
         } else {
             return

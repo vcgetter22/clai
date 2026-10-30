@@ -81,10 +81,15 @@ public enum FileFinder {
         return guardedFolders(home: home).contains { path == $0 || path.hasPrefix($0 + "/") }
     }
 
-    /// Whether `root` and the folders on the way to it stay out of guarded folders. Links are read as
-    /// text (`readlink`), so their targets are never touched before they are known to be safe.
+    /// Whether `root` exists and it and the folders on the way to it stay out of guarded folders.
+    /// Links are read as text (`readlink`) and their targets checked the same way, so a guarded
+    /// folder is never touched, not even through a chain of links.
     public static func isSafe(_ root: String, home: String = FileFinder.userHome) -> Bool {
-        if isGuarded(root, home: home) { return false }
+        isSafe(root, home: home, hops: 0)
+    }
+
+    private static func isSafe(_ root: String, home: String, hops: Int) -> Bool {
+        guard hops < 8, !isGuarded(root, home: home) else { return false }
         var path = ""
         for component in (root as NSString).pathComponents where component != "/" {
             path += "/" + component
@@ -93,7 +98,7 @@ public enum FileFinder {
             if info.st_mode & S_IFMT == S_IFLNK {
                 guard let target = try? FileManager.default.destinationOfSymbolicLink(atPath: path) else { return false }
                 let absolute = target.hasPrefix("/") ? target : ((path as NSString).deletingLastPathComponent as NSString).appendingPathComponent(target)
-                if isGuarded(absolute, home: home) { return false }
+                guard isSafe((absolute as NSString).standardizingPath, home: home, hops: hops + 1) else { return false }
             }
         }
         return true
@@ -208,28 +213,93 @@ public enum JSON {
         }
     }
 
-    /// One JSON object from a line, or nil.
+    /// One JSON object from a line, with only its metadata parsed (see `metadata`), or nil.
     public static func object(_ bytes: UnsafeRawBufferPointer) -> [String: Any]? {
-        guard bytes.count >= 2 else { return nil }
-        return (try? JSONSerialization.jsonObject(with: Data(bytes))) as? [String: Any]
-    }
-
-    /// The JSON object in a file, or nil.
-    public static func object(atPath path: String) -> [String: Any]? {
-        guard let data = FileManager.default.contents(atPath: path) else { return nil }
+        guard let data = metadata(bytes) else { return nil }
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
-    /// A whole number from any JSON number (or numeric string); 0 otherwise, also for numbers too
-    /// large for a 64-bit integer (a corrupt log must not stop clai).
+    /// The JSON object in a file, with only its metadata parsed, or nil.
+    public static func object(atPath path: String) -> [String: Any]? {
+        guard let data = FileManager.default.contents(atPath: path) else { return nil }
+        return data.withUnsafeBytes { object($0) }
+    }
+
+    /// The keys whose string values the readers use: kinds, ids, models, times and tiers.
+    static let keptKeys: [StaticString] = [
+        "type", "role", "id", "uuid", "model", "modelID", "timestamp", "_audit_timestamp",
+        "sessionId", "session_id", "requestId", "request_id", "speed", "service_tier", "limit_id", "plan_type",
+    ]
+
+    /// A copy of a JSON text in which every string value is emptied unless its key is in `keptKeys`.
+    /// Prompts, replies, thinking, tool input and file contents are stepped over (to their closing
+    /// quote) and never decoded, so the readers parse metadata and token counts and nothing else.
+    /// Keys, numbers and structure stay as they are. Nil when the text is not well formed.
+    static func metadata(_ text: UnsafeRawBufferPointer) -> Data? {
+        guard let start = text.baseAddress, text.count >= 2 else { return nil }
+        let n = text.count
+        let bytes = start.assumingMemoryBound(to: UInt8.self)
+        var out = Data(capacity: min(n, 16_384))
+        var keepStack: [Bool] = []
+        var keep = false // whether string values at this point are kept
+        var i = 0
+        while i < n {
+            let c = bytes[i]
+            if c == 0x22 { // a string: find the quote that ends it, past escaped ones
+                var end = i + 1
+                while true {
+                    guard end < n, let found = memchr(start + end, 0x22, n - end) else { return nil }
+                    end = UnsafeRawPointer(found) - start
+                    var slashes = 0
+                    while end - slashes - 1 > i, bytes[end - slashes - 1] == 0x5C { slashes += 1 }
+                    if slashes % 2 == 0 { break }
+                    end += 1
+                }
+                var next = end + 1
+                while next < n, bytes[next] == 0x20 || bytes[next] == 0x09 || bytes[next] == 0x0A || bytes[next] == 0x0D { next += 1 }
+                if next < n, bytes[next] == 0x3A { // a key
+                    out.append(bytes + i, count: end - i + 1)
+                    keep = isKept(bytes + i + 1, count: end - i - 1)
+                } else if keep {
+                    out.append(bytes + i, count: end - i + 1)
+                } else {
+                    out.append(contentsOf: [0x22, 0x22])
+                }
+                i = end + 1
+                continue
+            }
+            switch c {
+            case 0x7B: // { an object's own keys decide
+                keepStack.append(keep)
+                keep = false
+            case 0x5B: // [ elements follow the array's key
+                keepStack.append(keep)
+            case 0x7D, 0x5D: // } ]
+                keep = keepStack.popLast() ?? false
+            default:
+                break
+            }
+            out.append(c)
+            i += 1
+        }
+        return out
+    }
+
+    private static func isKept(_ key: UnsafePointer<UInt8>, count: Int) -> Bool {
+        keptKeys.contains { $0.utf8CodeUnitCount == count && memcmp($0.utf8Start, key, count) == 0 }
+    }
+
+    /// A token count from any JSON number (or numeric string). Negative counts and counts above
+    /// `Tokens.ceiling` come from corrupt logs and read as 0, so a corrupt log cannot stop clai or
+    /// inflate a total, and readers add counts up without overflowing.
     public static func int(_ value: Any?) -> Int64 {
-        func whole(_ d: Double) -> Int64 { d.isFinite && abs(d) < 9e18 ? Int64(d) : 0 }
+        func whole(_ d: Double) -> Int64 { d.isFinite && d > 0 && d <= Double(Tokens.ceiling) ? Int64(d) : 0 }
         switch value {
-        case let v as Int: return Int64(v)
-        case let v as Int64: return v
+        case let v as Int: return v > 0 && Int64(v) <= Tokens.ceiling ? Int64(v) : 0
+        case let v as Int64: return v > 0 && v <= Tokens.ceiling ? v : 0
         case let v as Double: return whole(v)
         case let v as NSNumber: return whole(v.doubleValue)
-        case let v as String: return Int64(v) ?? whole(Double(v) ?? 0)
+        case let v as String: return whole(Double(v) ?? 0)
         default: return 0
         }
     }

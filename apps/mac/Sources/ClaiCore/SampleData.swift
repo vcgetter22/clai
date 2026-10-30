@@ -2,8 +2,9 @@ import Foundation
 
 /// A made-up month of usage for screenshots and previews (`clai --render`). Never shown as real data.
 public enum SampleData {
-    /// A ledger with 60 days of plausible usage ending on `today`.
-    public static func ledger(today: Day) -> Ledger {
+    /// A ledger with 60 days of plausible usage ending on `today`, a few hours of each day in `timeZone`.
+    public static func ledger(today: Day, timeZone: TimeZone = .current) -> Ledger {
+        let days = DayResolver(timeZone: timeZone)
         var buckets: [BucketKey: BucketValue] = [:]
         var seed: UInt64 = 0x5EED
         func random() -> Double {
@@ -15,14 +16,16 @@ public enum SampleData {
             let weekday = (day.ordinal + 4) % 7 // 0 = Sunday
             let weekend = weekday == 0 || weekday == 6
             let busy = (weekend ? 0.25 : 1.0) * (0.55 + random() * 0.9)
+            // Between 9:00 and 17:00 local time.
+            let quarter = Quarter(time: days.start(of: day).timeIntervalSince1970 + Double(9 + offset % 8) * 3600)
             func add(_ tool: Tool, _ model: String, requests: Int, input: Int64, output: Int64, read: Int64, write: Int64) {
                 let n = max(0, Int(Double(requests) * busy))
                 guard n > 0 else { return }
                 let f = Double(n)
                 let tokens = Tokens(input: Int64(Double(input) * f), output: Int64(Double(output) * f),
                                     cacheRead: Int64(Double(read) * f), cacheWrite: Int64(Double(write) * f))
-                buckets[BucketKey(day: day, tool: tool, model: model), default: BucketValue()].tokens += tokens
-                buckets[BucketKey(day: day, tool: tool, model: model), default: BucketValue()].requests += n
+                buckets[BucketKey(quarter: quarter, tool: tool, model: model), default: BucketValue()].tokens += tokens
+                buckets[BucketKey(quarter: quarter, tool: tool, model: model), default: BucketValue()].requests += n
             }
             add(.claudeCode, "claude-opus-5-5", requests: 420, input: 60, output: 900, read: 62_000, write: 2_400)
             add(.claudeCode, "claude-haiku-5-5", requests: 160, input: 900, output: 220, read: 9_000, write: 600)
@@ -33,8 +36,11 @@ public enum SampleData {
         return Ledger(buckets: buckets)
     }
 
-    public static func summary(today: Day, pricer: Pricer = Pricer(list: .builtIn)) -> Summary {
-        Summary.make(ledger: ledger(today: today), pricer: pricer, today: today)
+    /// The sample month as the panel shows it at `now`.
+    public static func summary(now: Date = Date(), timeZone: TimeZone = .current, pricer: Pricer = Pricer(list: .builtIn)) -> Summary {
+        var days = DayResolver(timeZone: timeZone)
+        let today = days.day(at: now.timeIntervalSince1970)
+        return Summary.make(ledger: ledger(today: today, timeZone: timeZone), pricer: pricer, now: now.timeIntervalSince1970, days: &days)
     }
 
     public static let sources: [SourceStatus] = [
