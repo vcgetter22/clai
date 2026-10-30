@@ -1,62 +1,64 @@
 #!/usr/bin/env bash
-# Checks a packaged clai.app the way a user's Mac would run it: the embedded Node starts the
-# bundled engine, a scan of a sample Claude Code transcript produces a snapshot, and the app
-# itself launches and draws its panel. Run after package.sh on a Mac whose CPU matches ARCH.
+# Checks the packaged app on this Mac: a universal, signed bundle for macOS 13 and later; a report
+# from sample logs with the expected total; the ledger it writes; a launch that stays up; and the
+# offscreen render of the panel.
+#
+#   apps/mac/scripts/build-app.sh && apps/mac/scripts/smoke-test.sh
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-MAC="$ROOT/apps/mac"
+MAC="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${OUT:-$MAC/build}"
-ARCH="${ARCH:-$(uname -m | sed 's/x86_64/x64/')}"
-APP="$OUT/$ARCH/clai.app"
-NODE="$APP/Contents/Helpers/node"
-ENGINE="$APP/Contents/Resources/engine/clai.mjs"
-VERSION="$(node -p "require('$ROOT/apps/cli/package.json').version")"
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+APP="${APP:-$OUT/clai.app}"
+BIN="$APP/Contents/MacOS/clai"
 
-# Run a command with a time limit (macOS has no `timeout`).
-limit() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+fail() { echo "smoke test failed: $*" >&2; exit 1; }
+step() { printf '\n--- %s\n' "$*"; }
 
-echo "app: $APP ($(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist"))"
-file "$NODE" "$APP/Contents/MacOS/clai"
-codesign --verify --deep --strict "$APP"
-codesign -dv "$APP" 2>&1 | grep -E "Identifier|Signature|TeamIdentifier" || true
+step "Bundle"
+archs="$(lipo -archs "$BIN")"
+echo "architectures: $archs"
+[[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || fail "expected arm64 and x86_64, got $archs"
+codesign --verify --deep --strict "$APP" || fail "signature does not verify"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Contents/Info.plist")" == "io.github.vcgetter22.clai" ]] || fail "bundle id"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print LSUIElement' "$APP/Contents/Info.plist")" == "true" ]] || fail "LSUIElement"
+vtool -show-build "$BIN" | grep -E 'minos 13\.0' >/dev/null || fail "minimum macOS is not 13.0"
+test -s "$APP/Contents/Resources/AppIcon.icns" || fail "no icon"
 
-echo "engine version"
-got="$(limit 30 "$NODE" --disable-warning=ExperimentalWarning "$ENGINE" --version)"
-[[ "$got" == "$VERSION" ]] || { echo "expected $VERSION, got $got"; exit 1; }
+step "Sample logs"
+HOME_DIR="$(mktemp -d)"
+trap 'rm -rf "$HOME_DIR"' EXIT
+NOW="$(date -u -v-2M +%Y-%m-%dT%H:%M:%S.000Z)"
+mkdir -p "$HOME_DIR/.claude/projects/-Users-me-project" "$HOME_DIR/.codex/sessions/2026/10/30"
+# Claude Code: one Opus 4.6 request with 1M uncached input tokens ($5.00), written twice (streamed).
+line='{"type":"assistant","timestamp":"'"$NOW"'","sessionId":"s","requestId":"req_1","message":{"id":"msg_1","model":"claude-opus-4-6","content":[{"type":"text","text":"..."}],"usage":{"input_tokens":1000000,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}'
+printf '%s\n%s\n' "$line" "$line" > "$HOME_DIR/.claude/projects/-Users-me-project/s.jsonl"
+# Codex: one GPT-5.2-Codex response with 1M uncached input tokens ($1.75).
+{
+  echo '{"timestamp":"'"$NOW"'","type":"turn_context","payload":{"model":"gpt-5.2-codex"}}'
+  echo '{"timestamp":"'"$NOW"'","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1000000,"cached_input_tokens":0,"output_tokens":0,"total_tokens":1000000},"last_token_usage":{"input_tokens":1000000,"cached_input_tokens":0,"output_tokens":0,"total_tokens":1000000}}}}'
+} > "$HOME_DIR/.codex/sessions/2026/10/30/rollout-2026-10-30T09-00-00-0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b.jsonl"
 
-echo "scan a sample Claude Code transcript"
-mkdir -p "$WORK/home/.claude/projects/-Users-me-clai"
-node -e '
-const lines = [];
-for (let i = 0; i < 4; i++) lines.push(JSON.stringify({ type: "assistant", sessionId: "s1", cwd: "/Users/me/clai", timestamp: new Date(Date.now() - i * 600e3).toISOString(), requestId: "req_" + i,
-  message: { id: "msg_" + i, model: "claude-opus-5", role: "assistant", type: "message", content: [{ type: "text", text: "x" }],
-    usage: { input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 300000, cache_creation_input_tokens: 20000, cache_creation: { ephemeral_1h_input_tokens: 20000, ephemeral_5m_input_tokens: 0 } } } }));
-require("fs").writeFileSync(process.argv[1], lines.join("\n") + "\n");
-' "$WORK/home/.claude/projects/-Users-me-clai/s1.jsonl"
-HOME="$WORK/home" CLAI_HOME="$WORK/clai" limit 60 "$NODE" --disable-warning=ExperimentalWarning "$ENGINE" snapshot --scan > "$WORK/snapshot.json"
-node -e '
-const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-const found = s.scan.sources.filter((x) => x.found).map((x) => x.id);
-console.log(JSON.stringify({ schema: s.schema, events: s.events.total, today: s.today.usd, month: s.month.usd, found, watch: s.scan.watchPaths }));
-if (s.schema !== 1 || s.events.total !== 4 || !(s.today.usd > 0) || !found.includes("claude-code")) process.exit(1);
-' "$WORK/snapshot.json"
+step "Report"
+report="$(CLAI_HOME="$HOME_DIR" "$BIN" --report)"
+echo "$report"
+grep -q 'so far: \$6.75 API-equivalent' <<<"$report" || fail "expected \$6.75 this month"
+grep -q 'Claude Code' <<<"$report" || fail "Claude Code missing"
+grep -q 'Codex' <<<"$report" || fail "Codex missing"
+test -s "$HOME_DIR/Library/Application Support/clai/ledger.json" || fail "the ledger was not written"
 
-echo "app draws its panel (sample data, offscreen)"
-limit 90 "$APP/Contents/MacOS/clai" --render "$OUT/screens"
-ls -la "$OUT/screens"
-test -s "$OUT/screens/panel-light.png"
-test -s "$OUT/screens/panel-dark.png"
-
-echo "app starts against the sample home and stays up"
-HOME="$WORK/home" CLAI_HOME="$WORK/clai" "$APP/Contents/MacOS/clai" > "$WORK/app.log" 2>&1 &
+step "Launch"
+CLAI_HOME="$HOME_DIR" "$BIN" &
 pid=$!
 sleep 8
-if ! kill -0 "$pid" 2>/dev/null; then
-  echo "clai exited early:"; cat "$WORK/app.log"; exit 1
-fi
+kill -0 "$pid" 2>/dev/null || fail "the app quit or crashed after launch"
 kill "$pid"
 wait "$pid" 2>/dev/null || true
+echo "stayed up for 8 seconds"
+
+step "Render"
+"$BIN" --render "$OUT/screens"
+test -s "$OUT/screens/panel-light.png" || fail "no light render"
+test -s "$OUT/screens/panel-dark.png" || fail "no dark render"
+
+echo
 echo "smoke test passed"

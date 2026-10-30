@@ -1,142 +1,185 @@
 import AppKit
-import ClaiKit
+import ClaiCore
 import SwiftUI
 
-/// Settings live inside the panel, one swipe to the right of the numbers.
 struct SettingsPage: View {
-    @Environment(AppModel.self) private var model
-    @State private var budgetText = ""
-
-    private var snapshot: Snapshot? { model.snapshot }
+    @ObservedObject var state: AppState
+    let inWindow: Bool
 
     var body: some View {
-        @Bindable var prefs = model.prefs
-        Form {
-            Section("Menu bar") {
-                Picker("Show", selection: $prefs.menuBarDisplay) {
-                    ForEach(MenuBarDisplay.allCases) { display in
-                        Text(display.label).tag(display)
-                    }
-                }
-                .pickerStyle(.segmented)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 6) {
+                IconButton(symbol: "chevron.left", help: "Back") { state.page = .overview }
+                Text("Settings")
+                    .font(.system(size: 15, weight: .semibold))
+                Spacer()
             }
 
-            Section {
-                Toggle("Live updates", isOn: Binding(get: { model.prefs.liveUpdates }, set: { model.setPrefersLiveUpdates($0) }))
-                Picker("Also refresh every", selection: Binding(get: { model.prefs.refreshMinutes }, set: { model.setRefreshMinutes($0) })) {
-                    ForEach(Preferences.refreshChoices, id: \.self) { minutes in
-                        Text(minutes == 60 ? "hour" : "\(minutes) min").tag(minutes)
-                    }
-                }
-            } header: {
-                Text("Updates")
-            } footer: {
-                Text("Live updates watch the folders your tools write their logs to and refresh a few seconds after new usage.")
+            SettingsSection(title: "Menu bar") {
+                Segmented(options: MenuBarFigure.allCases.map { ($0, $0.label) }, selection: $state.figure)
             }
 
-            Section("Your plans") {
-                let plans = snapshot?.plans ?? []
-                if plans.isEmpty {
-                    Text("Declare what you pay for and clai shows what it is worth at list prices.")
-                        .foregroundStyle(.secondary)
+            SettingsSection(title: "Your plans", caption: "For plan value: this month's usage at API prices against what the plan costs.") {
+                ForEach([Vendor.anthropic, .openai, .google], id: \.self) { vendor in
+                    PlanPicker(state: state, vendor: vendor)
                 }
-                ForEach(plans) { plan in
+            }
+
+            SettingsSection(title: "General") {
+                Toggle("Open clai at login", isOn: Binding(get: { state.launchAtLogin }, set: { state.setLaunchAtLogin($0) }))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .disabled(!AppVersion.isInApplications)
+                if !AppVersion.isInApplications {
+                    Caption("Available once clai is in your Applications folder.")
+                } else if let note = state.loginItemNote {
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(plan.label)
-                            Text("\(Format.usd(plan.priceMonthly)) a month · \(Format.multiple(plan.multiple)) so far")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button("Remove") { Task { await model.removePlan(plan) } }
-                            .disabled(model.busy)
+                        Caption(note)
+                        Button("Open") { state.openLoginItemSettings() }
+                            .buttonStyle(.link)
+                            .font(.system(size: 11))
                     }
                 }
-                Menu("Add a plan") {
-                    ForEach(Providers.group(snapshot?.planOptions ?? [])) { group in
-                        Section(group.label) {
-                            ForEach(group.options) { option in
-                                Button("\(option.label) · \(Format.usd(option.priceMonthly))/mo") {
-                                    Task { await model.setPlan(option) }
-                                }
-                            }
-                        }
-                    }
-                }
-                .disabled(model.busy || (snapshot?.planOptions.isEmpty ?? true))
+                Toggle("Check for updates and current prices", isOn: $state.checkOnline)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                Caption("Once a day clai asks getclai.vercel.app for the price list and GitHub for a newer version. Nothing about your usage is sent.")
             }
 
-            Section {
-                if let budget = snapshot?.budgets.first {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(budget.name)
-                            Text("\(Format.usd(budget.mtdUsd)) used, heading for \(Format.usd(budget.projectedUsd))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text(Format.usd(budget.amountUsd)).monospacedDigit()
-                        Button("Remove") { Task { await model.removeBudget(budget) } }
-                            .disabled(model.busy)
-                    }
+            SettingsSection(title: "Where clai looks", caption: "Only token counts, model names and times are read. Never prompts, code or replies.") {
+                ForEach(state.sources) { source in
+                    SourceRow(source: source)
                 }
-                HStack {
-                    TextField("Amount in USD", text: $budgetText)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit(saveBudget)
-                    Button(snapshot?.budgets.isEmpty == false ? "Update" : "Set", action: saveBudget)
-                        .disabled(budgetAmount == nil || model.busy)
-                }
-            } header: {
-                Text("Monthly budget")
-            } footer: {
-                Text("The ring on the month card fills as the month’s spend approaches it.")
             }
 
-            Section {
-                Toggle("Open at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-                Toggle("Check for updates", isOn: $prefs.checkForUpdates)
-                    .help("Asks GitHub once a day whether a newer clai for Mac exists. Sends no usage data.")
-                HStack {
-                    LabeledContent("Data", value: displayPath(model.dataFolder))
-                    Button("Show") { model.revealDataFolder() }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("clai \(AppVersion.current) · prices of \(state.priceList.version)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 14) {
+                    LinkButton(title: "getclai.vercel.app", url: "https://getclai.vercel.app")
+                    LinkButton(title: "Source code", url: "https://github.com/vcgetter22/clai")
+                    LinkButton(title: "Report a problem", url: "https://github.com/vcgetter22/clai/issues")
+                    Spacer()
+                    Button("Quit clai") { NSApp.terminate(nil) }
+                        .controlSize(.small)
                 }
-            } header: {
-                Text("General")
-            } footer: {
-                Text("clai counts the AI tools that run on this Mac and log their usage here. Chats on claude.ai and Claude Code sessions that run in the cloud leave no logs on this Mac, so they are not included.")
-            }
-
-            Section("About") {
-                LabeledContent("clai for Mac", value: model.appVersion)
-                LabeledContent("Engine", value: snapshot?.engineVersion ?? "-")
-                LabeledContent("Prices as of", value: snapshot?.pricingVersion ?? "-")
-                Link("getclai.vercel.app", destination: URL(string: "https://getclai.vercel.app")!)
-                Link("Source and issues on GitHub", destination: URL(string: "https://github.com/vcgetter22/clai")!)
-                Button("Quit clai", role: .destructive) { model.quit() }
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .frame(height: 560)
+        .padding(16)
+        .padding(.top, inWindow ? 18 : 0)
+    }
+}
+
+private struct SettingsSection<Content: View>: View {
+    let title: String
+    var caption: String?
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(.secondary)
+            content
+            if let caption { Caption(caption) }
+        }
+    }
+}
+
+private struct Caption: View {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
     }
 
-    private var budgetAmount: Double? {
-        let cleaned = budgetText.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
-        guard let value = Double(cleaned), value > 0, value.isFinite else { return nil }
-        return value
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct PlanPicker: View {
+    @ObservedObject var state: AppState
+    let vendor: Vendor
+
+    var body: some View {
+        let selection = Binding<String>(
+            get: { state.plans[vendor] ?? "" },
+            set: { state.setPlan($0.isEmpty ? nil : $0, for: vendor) }
+        )
+        HStack {
+            Text(label)
+                .font(.system(size: 12.5))
+            Spacer()
+            Picker(label, selection: selection) {
+                Text("None").tag("")
+                ForEach(state.priceList.plans.filter { $0.vendor == vendor }) { plan in
+                    Text("\(plan.name) · \(Format.usd(plan.monthly))/mo").tag(plan.id)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .frame(width: 210)
+        }
     }
 
-    private func saveBudget() {
-        guard let amount = budgetAmount else { return }
-        budgetText = ""
-        Task { await model.setBudget(amount) }
+    private var label: String {
+        switch vendor {
+        case .anthropic: return "Claude"
+        case .openai: return "ChatGPT"
+        case .google: return "Google AI"
+        case .other: return "Other"
+        }
+    }
+}
+
+private struct SourceRow: View {
+    let source: SourceStatus
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Circle()
+                .fill(source.found ? Theme.color(source.tool) : Color.clear)
+                .overlay(Circle().strokeBorder(source.found ? Color.clear : Color.secondary.opacity(0.5)))
+                .frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(source.tool.name)
+                    .font(.system(size: 12.5, weight: .medium))
+                Text(folder)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Text(source.found ? "\(Format.count(source.requests)) requests" : "not found")
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+        .help(source.folders.joined(separator: "\n"))
     }
 
-    private func displayPath(_ url: URL) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return url.path.hasPrefix(home) ? "~" + url.path.dropFirst(home.count) : url.path
+    private var folder: String {
+        guard let first = source.folders.first else { return "" }
+        return (first as NSString).abbreviatingWithTildeInPath
+    }
+}
+
+private struct LinkButton: View {
+    let title: String
+    let url: String
+
+    var body: some View {
+        Button(title) {
+            if let link = URL(string: url) { NSWorkspace.shared.open(link) }
+        }
+        .buttonStyle(.link)
+        .font(.system(size: 11))
     }
 }

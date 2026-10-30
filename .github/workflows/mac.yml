@@ -1,27 +1,17 @@
 name: mac
-# clai for Mac: Swift tests, then the per-architecture app bundles with the bundled engine and
-# Node, a smoke test of the packaged app, and screenshots. A `mac-v*` tag publishes the DMGs and
-# zips as a GitHub release, which getclai.vercel.app/download links to.
+# clai for Mac: tests (macOS and Linux), the universal app, a smoke test of the packaged app and
+# screenshots. A `mac-v*` tag publishes clai-mac.dmg, clai-mac.zip and checksums.txt as a GitHub
+# release, which getclai.vercel.app/download links to.
 on:
   push:
     branches: [main, 'claude/**']
     tags: ['mac-v*']
     paths:
       - 'apps/mac/**'
-      - 'apps/cli/**'
-      - 'apps/server/**'
-      - 'apps/dashboard/**'
-      - 'packages/**'
-      - 'scripts/bundle-engine.mjs'
-      - 'package-lock.json'
       - '.github/workflows/mac.yml'
   pull_request:
     paths:
       - 'apps/mac/**'
-      - 'apps/cli/**'
-      - 'apps/server/**'
-      - 'packages/**'
-      - 'scripts/bundle-engine.mjs'
       - '.github/workflows/mac.yml'
   # A release published from GitHub's web form (which creates its `mac-v*` tag) gets the files too.
   release:
@@ -36,28 +26,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  core-on-linux:
+    # The log readers, prices and ledger are Foundation only; this keeps them building on Linux.
+    if: github.event_name != 'release'
+    runs-on: ubuntu-latest
+    container: swift:6.2
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tests
+        working-directory: apps/mac
+        run: swift test
+
+  app:
     if: github.event_name != 'release' || startsWith(github.ref, 'refs/tags/mac-v')
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 40
     env:
-      # Signing turns on when the repository has these secrets (see apps/mac/README.md).
+      # Developer ID signing and notarization turn on when the repository has these secrets.
       HAS_SIGNING_CERT: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
       - name: Toolchain
         run: |
           sw_vers
           xcodebuild -version
           swift --version
           uname -m
-      - run: npm ci --no-audit --no-fund
-      - run: npm run build
-      - name: Swift tests (ClaiKit)
+      - name: Tests
         working-directory: apps/mac
         run: swift test
       - name: Import signing certificate
@@ -73,23 +69,22 @@ jobs:
           security import "$RUNNER_TEMP/cert.p12" -k "$RUNNER_TEMP/build.keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k ci "$RUNNER_TEMP/build.keychain"
           security list-keychains -d user -s "$RUNNER_TEMP/build.keychain" $(security list-keychains -d user | tr -d '"')
-      - name: Package
+      - name: Build the app
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-        # A release build takes its version from the tag (mac-v0.4.1 builds 0.4.1); other builds
-        # use the CLI's version.
+        # A release build takes its version from the tag: mac-v1.0.1 builds 1.0.1.
         run: |
           if [[ "$GITHUB_REF" == refs/tags/mac-v* ]]; then export VERSION="${GITHUB_REF#refs/tags/mac-v}"; fi
-          apps/mac/scripts/package.sh
-      - name: Smoke test (arm64 app)
-        run: ARCH=arm64 apps/mac/scripts/smoke-test.sh
-      - name: Screenshots
+          apps/mac/scripts/build-app.sh
+      - name: Smoke test
+        run: apps/mac/scripts/smoke-test.sh
+      - name: Screenshots of the running app
         continue-on-error: true
-        timeout-minutes: 5
-        run: ARCH=arm64 apps/mac/scripts/screenshots.sh
+        timeout-minutes: 3
+        run: apps/mac/scripts/screenshots.sh
       - uses: actions/upload-artifact@v4
         with:
           name: clai-mac
@@ -104,7 +99,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/mac-v')
-    needs: build
+    needs: app
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -120,17 +115,15 @@ jobs:
         run: |
           VERSION="${TAG#mac-v}"
           {
-            echo "clai for Mac $VERSION: your AI spend in the menu bar, priced token by token from the logs your tools already keep. Usage data stays on your Mac."
+            echo "clai for Mac $VERSION: your AI usage in the menu bar, priced at API list prices from the logs Claude Code, Codex, Gemini CLI, Qwen Code and OpenCode keep on your Mac. Usage data stays on your Mac."
             echo
-            echo "**Download:** [Apple silicon](https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/clai-mac-arm64.dmg) · [Intel](https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/clai-mac-x64.dmg) · or from https://getclai.vercel.app"
+            echo "**Download:** [clai-mac.dmg](https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/clai-mac.dmg) (Apple silicon and Intel, macOS 13 or later), or from https://getclai.vercel.app"
             echo
-            echo "**First launch.** This build is signed ad hoc, not yet notarized by Apple, so macOS says it cannot check clai for malware. Click Done, open System Settings → Privacy & Security, click **Open Anyway** next to clai and confirm. Or install from Terminal, which skips that prompt:"
+            echo "**First launch.** This build is not notarized by Apple yet, so macOS says it cannot check clai for malware. Click Done, open System Settings → Privacy & Security, click **Open Anyway** next to clai and confirm. Or install from Terminal, which skips that prompt:"
             echo
             echo '```'
             echo 'curl -fsSL https://getclai.vercel.app/install.sh | sh'
             echo '```'
-            echo
-            echo "Requires macOS 14 Sonoma or later. The app includes Node.js 24 LTS to run the clai engine; nothing else to install."
             echo
             echo "**SHA-256**"
             echo
@@ -139,7 +132,6 @@ jobs:
             echo '```'
           } > notes.md
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            # Published by hand from the web form: add the files and the standard notes.
             gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "clai for Mac $VERSION" --notes-file notes.md
           else
