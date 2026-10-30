@@ -12,11 +12,11 @@ public enum Report {
             out.append("No usage found.")
         } else {
             out.append("\(Format.monthName(s.today)) so far: \(Format.usd(s.monthCost)) API-equivalent · today \(Format.usd(s.todayCost)) · last month \(Format.usd(s.lastMonthCost))")
-            out.append("\(Format.count(s.monthRequests)) requests, \(Format.tokens(s.monthTokens)) tokens this month; last usage \(s.lastUsageDay?.description ?? "none")")
+            out.append("\(Format.count(s.monthRequests, "request")), \(Format.tokens(s.monthTokens)) tokens this month; last usage \(s.lastUsageDay?.description ?? "none")")
             out.append("")
             out.append("Tools this month")
             for t in s.tools {
-                out.append("  " + pad(t.tool.name, 16) + pad(Format.usd(t.cost), 12, right: true) + pad(Format.tokens(t.tokens), 9, right: true) + " tokens" + pad(Format.count(t.requests), 10, right: true) + " requests")
+                out.append("  " + pad(t.tool.name, 16) + pad(Format.usd(t.cost), 12, right: true) + pad(Format.tokens(t.tokens), 9, right: true) + " tokens" + "  " + Format.count(t.requests, "request"))
             }
             out.append("")
             out.append("Models this month")
@@ -34,7 +34,7 @@ public enum Report {
         out.append("")
         out.append("Sources")
         for source in result.sources {
-            let state = source.found ? "\(Format.count(source.files)) files, \(Format.count(source.requests)) requests" : "not found"
+            let state = source.found ? "\(Format.count(source.files, "file")), \(Format.count(source.requests, "request"))" : "not found"
             out.append("  " + pad(source.tool.name, 16) + pad(state, 34) + source.folders.joined(separator: ", "))
         }
         if let limits = result.codexLimits {

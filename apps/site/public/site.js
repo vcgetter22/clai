@@ -1,43 +1,6 @@
-// getclai.vercel.app: pick the right download, copy the install command, reveal sections once.
+// getclai.vercel.app: copy the install command, reveal sections once.
 (() => {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  // Apple silicon is the default; switch to Intel only when the browser says so.
-  async function architecture() {
-    try {
-      if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
-        const { architecture: arch } = await navigator.userAgentData.getHighEntropyValues(['architecture']);
-        if (arch === 'x86') return 'intel';
-        if (arch === 'arm') return 'arm';
-      }
-    } catch {
-      /* fall through */
-    }
-    try {
-      const gl = document.createElement('canvas').getContext('webgl');
-      const info = gl && gl.getExtension('WEBGL_debug_renderer_info');
-      const renderer = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
-      if (/Apple (M\d|GPU)/i.test(renderer)) return 'arm';
-      if (/Intel|AMD|Radeon/i.test(renderer)) return 'intel';
-    } catch {
-      /* fall through */
-    }
-    return 'unknown';
-  }
-
-  const isMac = /Macintosh|Mac OS X/.test(navigator.userAgent) && !/iPhone|iPad/.test(navigator.userAgent);
-  architecture().then((arch) => {
-    if (!isMac || arch !== 'intel') return;
-    document.querySelectorAll('[data-download]').forEach((a) => a.setAttribute('href', '/download/mac-intel'));
-    document.querySelectorAll('[data-download-meta]').forEach((el) => (el.textContent = 'Intel · 34 MB · macOS 14 or later'));
-    document.querySelectorAll('[data-other-arch]').forEach((a) => {
-      a.setAttribute('href', '/download/mac');
-      a.textContent = 'Apple silicon? Get that version';
-    });
-  });
-  if (!isMac) {
-    document.querySelectorAll('[data-download-meta]').forEach((el) => (el.textContent = 'For Macs with macOS 14 or later'));
-  }
 
   // Copy buttons.
   document.querySelectorAll('[data-copy]').forEach((button) => {

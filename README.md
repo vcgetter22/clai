@@ -1,104 +1,71 @@
 # clai
 
-**See what your AI really costs.** clai is a usage and cost tracker for Claude (Claude Code, the API, Pro/Max/Team/Enterprise), ChatGPT and Codex, Gemini, Cursor, GitHub Copilot, OpenRouter and other providers. It reads usage metadata from the tools you already use, prices every token with a maintained catalog, and tells you what a plan is worth, where money is wasted, and what next month will cost.
+**Your AI usage, priced, in the menu bar.** clai for Mac reads the logs that AI coding tools already keep on your Mac, prices every request at the vendor's API list price, and shows today, this month, the last 30 days and what your plan is worth.
 
-- **Local-first and free.** `clai scan` reads the session logs your AI tools already keep on your machine. Nothing leaves the device.
-- **Metadata only.** clai reads token counts, model ids, timestamps and project labels. It never reads or stores prompt or response content.
-- **Real prices.** A versioned catalog of 140+ models with cache, batch and long-context rules. Subscription usage is valued at API list price so a $200 Max plan can be compared with pay-as-you-go.
-- **Insights, not just charts.** Plan value, month-end forecast, budget breaches, anomalies, model mix savings, cache efficiency, context bloat, idle seats.
-- **Teams.** Members run `clai sync` to a self-hosted team server (or the hosted service); admins connect the Anthropic, OpenAI, Cursor, Copilot and OpenRouter admin APIs for per-person, per-project and per-key cost.
+- **Works with** Claude Code, Claude Cowork, Codex (CLI, IDE extension and app), Gemini CLI, Qwen Code and OpenCode.
+- **Local and private.** No account, no telemetry. clai reads token counts, model names and times, never prompts, code or replies.
+- **Honest numbers.** Every request is priced at the list price of the day it ran (cache reads and writes, fast mode, long prompts, web searches included) and labelled *API-equivalent*. With a subscription you pay the plan; the figure shows what the same work would cost on the API.
+- **History that stays.** Claude Code and Gemini CLI delete old logs after 30 days; clai keeps the daily totals.
+- **One small app.** Native Swift, about 3 MB, Apple silicon and Intel, macOS 13 or later.
 
-## clai for Mac
+## Install
 
-A menu bar app with this month's spend next to the clai tally and a panel with the month so far, the forecast, what your plan is worth, a 30-day chart, where the money went and tips. It runs the same engine as the CLI and refreshes a few seconds after your tools write their logs. Usage data stays on your Mac. Opening clai again (or launching it for the first time) shows the panel in a window too, so it can always be found and quit.
-
-**Download:** https://getclai.vercel.app (Apple silicon and Intel, macOS 14 or later), or from Terminal:
+Download from **https://getclai.vercel.app**, or in Terminal:
 
 ```bash
 curl -fsSL https://getclai.vercel.app/install.sh | sh
 ```
 
-Source and build instructions: [apps/mac](apps/mac/README.md).
+clai is not notarized by Apple yet. The first time you open a downloaded copy, macOS says it cannot check it; open System Settings → Privacy & Security and click **Open Anyway**. The Terminal install avoids that prompt (files `curl` downloads are not quarantined) and checks the download against the release's SHA-256 checksum.
+
+clai lives in the menu bar. The first launch also opens its panel in a window, and opening clai again always brings that window back, so it can be found even when the menu bar item is hidden behind the camera notch. Quit with ⌘Q in the window or a right click on the menu bar item.
+
+## What clai reads
+
+| Tool | Where | What |
+|---|---|---|
+| Claude Code (CLI, IDE extensions, local sessions of the Claude app) | `~/.claude/projects`, `~/.config/claude/projects` | `message.usage` of assistant lines |
+| Claude Cowork | `~/Library/Application Support/Claude/local-agent-mode-sessions` | the same, per session |
+| Codex (CLI, IDE extension, app) | `~/.codex/sessions`, `~/.codex/archived_sessions` | `token_count` events, plan limits |
+| Gemini CLI | `~/.gemini/tmp/*/chats` | `tokens` of model replies |
+| Qwen Code | `~/.qwen/projects/*/chats` | `usageMetadata` of assistant records |
+| OpenCode | `~/.local/share/opencode` (`opencode.db` and the older JSON files) | `tokens` and `cost` of assistant messages |
+
+Each request is counted once, even when a tool writes it several times (streamed replies, resumed or forked sessions, archived copies). clai never looks inside Desktop, Documents, Downloads, iCloud Drive or other apps' containers, so macOS never asks for folder access.
+
+Not counted, because they keep no usage logs on your Mac: chats on claude.ai, chatgpt.com and gemini.google.com, Cursor, GitHub Copilot, and agents that run in the vendor's cloud.
+
+To see what clai counts on your Mac:
+
+```bash
+/Applications/clai.app/Contents/MacOS/clai --report
+```
 
 ## Where clai keeps things
 
-Everything clai writes is in one folder, `~/.clai` (or `$CLAI_HOME`):
+- `~/Library/Application Support/clai/ledger.json`: daily totals per tool and model (token counts and request counts).
+- `~/Library/Application Support/clai/prices.json`: the latest price list, if a newer one than the app's was fetched.
+- `~/Library/Preferences/io.github.vcgetter22.clai.plist`: your settings.
 
-- `clai.db`: usage events (token counts, model ids, timestamps, project labels), your plans and budgets, and how far each log file has been read. SQLite; `clai.db-wal` and `clai.db-shm` are its journal files.
-- `credentials.json`: only if you connect a provider's admin API (mode 0600, never copied into the database).
+Once a day clai fetches the price list from getclai.vercel.app/prices.json and asks GitHub for a newer release. Nothing about your usage is sent, and both can be turned off in Settings.
 
-clai for Mac adds the app itself, `/Applications/clai.app` (its Node runtime and the engine are inside the bundle; nothing is installed elsewhere), its settings in `~/Library/Preferences/io.github.vcgetter22.clai.plist`, and a login item if you turn on open at login.
+To remove clai: quit it, delete `/Applications/clai.app` and `~/Library/Application Support/clai`.
 
-clai only reads, never writes: `~/.claude/projects` (Claude Code), `~/Library/Application Support/Claude/local-agent-mode-sessions` (Cowork in the Claude app), `~/.codex/sessions` (Codex CLI), `~/.gemini` (Gemini CLI), `~/.local/share/opencode` (OpenCode), the extension storage of Cline and Roo Code in VS Code, Cursor and VSCodium, and `.aider.chat.history.md` in your home folder and one level below. On a Mac it never looks inside Desktop, Documents or Downloads, so macOS never asks for folder access (`AIDER_HISTORY_ROOTS` can point Aider's search there). Sessions that run in Anthropic's cloud and chats on claude.ai keep their logs on Anthropic's servers, so clai cannot count them.
-
-To remove clai completely: quit it, then delete `/Applications/clai.app`, `~/.clai` and `~/Library/Preferences/io.github.vcgetter22.clai.plist`.
-
-## Quick start (command line)
+## Build from source
 
 ```bash
-npx @claii/cli scan        # detect Claude Code, Cowork, Codex CLI, Gemini CLI, OpenCode, Cline, Aider and ingest usage
-npx @claii/cli report      # totals, forecast, by provider / model / project
-npx @claii/cli insights    # savings opportunities and warnings
-npx @claii/cli dashboard   # local web dashboard at http://127.0.0.1:4321
+git clone https://github.com/vcgetter22/clai && cd clai/apps/mac
+swift test                            # macOS or Linux
+swift run Clai                        # run the app from source (macOS)
+scripts/build-app.sh                  # build/dist: clai-mac.dmg, clai-mac.zip, checksums.txt
 ```
 
-Declare what you pay for, so clai can value it:
+Needs Swift 5.9 or later (Xcode 15+ or the Command Line Tools). Details in [apps/mac/README.md](apps/mac/README.md).
 
-```bash
-clai plan set anthropic max_20x      # or: pro, max_5x, team_premium; openai plus/pro; cursor pro; github copilot_pro
-clai budget set "AI tools" 300       # monthly budget with breach forecast
-```
+## Repository
 
-Connect provider admin APIs (teams, API workloads):
+- `apps/mac`: the app. `Sources/ClaiCore` reads the logs, prices requests and keeps the ledger (Foundation only, tested on macOS and Linux); `Sources/Clai` is the menu bar app (AppKit and SwiftUI).
+- `apps/site`: getclai.vercel.app, static files, including `prices.json`.
+- `docs/decisions.md`: why things are the way they are.
 
-```bash
-clai connect anthropic-admin --set adminKey=sk-ant-admin...
-clai connect openai-admin --set adminKey=sk-admin-...
-clai connect openrouter --set apiKey=sk-or-...
-clai connect cursor-admin --set apiKey=key_...
-clai connect github-copilot --set token=ghp_... --set org=my-org
-clai pull                             # pull usage and billed costs from all configured connectors
-```
-
-Other commands: `clai import <export.zip>` (claude.ai / ChatGPT data exports), `clai export --format csv`, `clai status` (one line for your shell prompt), `clai doctor` (environment check and a cross-check against Claude Code's own `/stats` numbers), `clai pricing list|show|set|check`, `clai ask "which project cost the most last week?"` (uses Claude; needs `ANTHROPIC_API_KEY` or `ant auth login`).
-
-Every command accepts `--json` for scripting and `--since 7d|30d|month|all|YYYY-MM-DD`.
-
-## Team mode
-
-```bash
-# on a server (Docker or any Node 22.13+ host)
-CLAI_HOME=/var/lib/clai PORT=8787 npx @claii/server        # prints a bootstrap admin token
-# admin: create member tokens via POST /api/admin/tokens, configure connectors in ~/.clai/credentials.json on the server
-# each member:
-clai config set identity.email jane@acme.com
-clai sync --server https://clai.acme.internal --token clai_mem_...
-```
-
-The team dashboard shows spend per person, project, model and provider, seat utilisation and idle seats, budgets and insights across the whole company. Working directories and git remotes are stripped before syncing by default; project labels are kept.
-
-## How costs are computed
-
-1. Each connector normalizes usage into events with uncached input, cache reads, cache writes (5m / 1h), output and reasoning tokens.
-2. The model id is resolved against the catalog (Bedrock, Vertex and OpenRouter ids included).
-3. Cost = tokens x price, with provider rules (Anthropic cache writes 1.25x / 2x, cache reads 0.1x; batch 50%; Gemini and Grok long-context tiers).
-4. When a provider reports billed amounts (Admin API cost reports, OpenRouter, Cursor), the billed figure wins and is labelled *billed*; otherwise the figure is *computed* (API-equivalent) or *estimated* (data exports, where tokens are inferred from text length).
-
-`clai doctor` compares clai's numbers with Claude Code's own `stats-cache.json` so you can see the two agree.
-
-## Development
-
-```bash
-npm install
-npm run build          # core, store, connectors, server, cli, dashboard
-npm test               # vitest
-npm run clai -- scan   # run the CLI from the repo
-```
-
-Packages: `packages/core` (types, pricing catalog, cost engine, insights), `packages/store` (SQLite via `node:sqlite`), `packages/connectors` (local logs, provider APIs, data exports), `apps/cli`, `apps/server` (Hono API + team mode), `apps/dashboard` (Vite + React), `apps/mac` (SwiftUI menu bar app), `apps/site` (getclai.vercel.app). See `docs/` for the product spec, architecture, connector matrix, market analysis and roadmap.
-
-## Privacy
-
-clai's boundary is architectural, not a setting: connectors only ever extract counts, ids and timestamps. Transcript text is never parsed into memory beyond the usage fields, never stored, and never transmitted. Credentials live in `~/.clai/credentials.json` with mode 0600 and are never written to the database. The local dashboard binds to 127.0.0.1.
-
-License: MIT.
+MIT License.

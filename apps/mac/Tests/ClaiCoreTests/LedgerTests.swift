@@ -130,3 +130,24 @@ final class SampleDataTests: XCTestCase {
         XCTAssertNotNil(summary.projectedMonthCost)
     }
 }
+
+final class SourceStatusTests: XCTestCase {
+    func testEachToolListsItsOwnFoldersAndFiles() {
+        let home = TempHome()
+        home.write(".claude/projects/p/a.jsonl", lines([Fixture.claude(id: "msg_a")]))
+        home.write(".claude/projects/p/b.jsonl", lines([Fixture.claude(id: "msg_b")]))
+        home.write("Library/Application Support/Claude/local-agent-mode-sessions/o/u/s/.claude/projects/x/c.jsonl", lines([Fixture.claude(id: "msg_c")]))
+        let sources = UsageScanner(home: home.path, readers: [ClaudeReader()], ledgerURL: nil)
+            .refresh(pricer: Pricer(list: .builtIn), now: Date(timeIntervalSince1970: Timestamp.parse("2026-10-30T12:00:00Z")!), timeZone: utc).sources
+        let code = sources.first { $0.tool == .claudeCode }!
+        let cowork = sources.first { $0.tool == .cowork }!
+        XCTAssertEqual(code.files, 2)
+        XCTAssertEqual(code.requests, 2)
+        XCTAssertEqual(cowork.files, 1)
+        XCTAssertEqual(cowork.requests, 1)
+        XCTAssertFalse(code.folders.contains { $0.contains("local-agent-mode-sessions") })
+        XCTAssertEqual(cowork.folders.count, 1)
+        XCTAssertEqual(Format.count(1, "request"), "1 request")
+        XCTAssertEqual(Format.count(1_234, "request"), "1,234 requests")
+    }
+}

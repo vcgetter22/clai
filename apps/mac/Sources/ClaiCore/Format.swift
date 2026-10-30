@@ -39,6 +39,11 @@ public enum Format {
     /// `1,234`
     public static func count(_ value: Int) -> String { grouped(value) }
 
+    /// `1 request`, `1,234 requests`
+    public static func count(_ value: Int, _ singular: String, _ plural: String? = nil) -> String {
+        grouped(value) + " " + (value == 1 ? singular : plural ?? singular + "s")
+    }
+
     /// `12.3×`
     public static func multiple(_ value: Double) -> String {
         guard value.isFinite else { return "–" }

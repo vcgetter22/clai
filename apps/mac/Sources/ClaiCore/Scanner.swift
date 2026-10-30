@@ -7,6 +7,10 @@ public protocol LogReader: AnyObject {
     var tools: [Tool] { get }
     /// The folders the reader looks in, for the settings list. Paths start with the home folder.
     func folders(home: String) -> [String]
+    /// The folders that belong to one of the reader's tools.
+    func folders(for tool: Tool, home: String) -> [String]
+    /// The tool a file belongs to.
+    func tool(for path: String, home: String) -> Tool
     /// The log files to read now.
     func files(home: String) -> [String]
     /// How a file is read.
@@ -18,6 +22,8 @@ public protocol LogReader: AnyObject {
 }
 
 extension LogReader {
+    public func folders(for tool: Tool, home: String) -> [String] { folders(home: home) }
+    public func tool(for path: String, home: String) -> Tool { tools[0] }
     public func mode(for path: String) -> ReadMode { .appendedLines }
     public func stamp(of path: String) -> FileStamp? { FileStamp.of(path) }
 }
@@ -87,7 +93,7 @@ public final class UsageScanner: @unchecked Sendable {
     private var liveIsDirty = true
     private var lastPrices = ""
     private var lastTimeZone = ""
-    private var filesPerReader: [Int: Int] = [:]
+    private var filesPerTool: [Tool: Int] = [:]
 
     public init(home: String, readers: [LogReader] = LogReaders.all, ledgerURL: URL?) {
         self.home = home
@@ -110,11 +116,12 @@ public final class UsageScanner: @unchecked Sendable {
         // Which files exist now, per reader.
         var wanted: [(path: String, reader: Int)] = []
         var seen = Set<String>()
-        filesPerReader = [:]
+        filesPerTool = [:]
         for (index, reader) in readers.enumerated() {
-            let found = reader.files(home: home)
-            filesPerReader[index] = found.count
-            for path in found where seen.insert(path).inserted { wanted.append((path, index)) }
+            for path in reader.files(home: home) where seen.insert(path).inserted {
+                wanted.append((path, index))
+                filesPerTool[reader.tool(for: path, home: home), default: 0] += 1
+            }
         }
 
         // Which of them changed since the last read.
@@ -216,22 +223,13 @@ public final class UsageScanner: @unchecked Sendable {
 
     private func sourceStatus() -> [SourceStatus] {
         var out: [Tool: SourceStatus] = [:]
-        for (index, reader) in readers.enumerated() {
-            for tool in reader.tools {
-                var status = out[tool] ?? SourceStatus(tool: tool, folders: [], files: 0, requests: 0)
-                status.folders.append(contentsOf: reader.folders(home: home).filter { !status.folders.contains($0) })
-                out[tool] = status
+        for reader in readers {
+            for tool in reader.tools where out[tool] == nil {
+                out[tool] = SourceStatus(tool: tool, folders: reader.folders(for: tool, home: home),
+                                         files: filesPerTool[tool] ?? 0, requests: requestsPerTool[tool] ?? 0)
             }
-            // Files are counted for the reader's first tool; requests per tool below.
-            if let first = reader.tools.first { out[first]?.files += filesPerReader[index] ?? 0 }
         }
-        for (tool, count) in requestsPerTool { out[tool]?.requests = count }
-        // A tool that shares a reader (Cowork, Claude Code) counts as found when it has requests.
-        return Tool.allCases.compactMap { tool in
-            guard var status = out[tool] else { return nil }
-            if status.files == 0, status.requests > 0 { status.files = 1 }
-            return status
-        }
+        return Tool.allCases.compactMap { out[$0] }
     }
 
     private func latestCodexLimits() -> RateLimits? {

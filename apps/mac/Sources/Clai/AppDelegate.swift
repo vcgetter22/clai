@@ -39,8 +39,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // menu bar in System Settings).
         if arguments.contains("--open-panel") {
             // For screenshots of the real panel.
+            let settings = arguments.contains("--settings")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                MainActor.assumeIsolated { self?.statusItem?.showPopover() }
+                MainActor.assumeIsolated {
+                    self?.statusItem?.showPopover()
+                    if settings { self?.state?.page = .settings }
+                }
             }
             return
         }

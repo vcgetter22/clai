@@ -5,6 +5,8 @@ import SwiftUI
 enum PanelContext: Equatable {
     case popover
     case window(welcome: Bool)
+    /// Drawn offscreen for screenshots (`--render`): no scroll view, which cannot be drawn there.
+    case image
 }
 
 /// The panel: in the popover under the menu bar item and in clai's window.
@@ -13,6 +15,20 @@ struct PanelView: View {
     let context: PanelContext
 
     var body: some View {
+        if context == .image {
+            content
+        } else {
+            FittingScroll(maxHeight: maxHeight) { content }
+                .frame(width: Theme.panelWidth)
+        }
+    }
+
+    private var inWindow: Bool {
+        if case .window = context { return true }
+        return false
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             if case .window(let welcome) = context, welcome {
                 WelcomeNote()
@@ -22,16 +38,59 @@ struct PanelView: View {
             if AppVersion.needsMoving && !state.isSample {
                 MoveNote()
                     .padding(.horizontal, 16)
-                    .padding(.top, context == .popover ? 16 : 34)
+                    .padding(.top, inWindow ? 34 : 16)
             }
             switch state.page {
             case .overview:
-                Overview(state: state, inWindow: context != .popover)
+                Overview(state: state, inWindow: inWindow)
             case .settings:
-                SettingsPage(state: state, inWindow: context != .popover)
+                SettingsPage(state: state, inWindow: inWindow)
             }
         }
         .frame(width: Theme.panelWidth)
+    }
+
+    /// The panel's height may not exceed the screen (a popover is cut off there, a window runs under the Dock).
+    private var maxHeight: CGFloat {
+        let screen = NSScreen.main?.visibleFrame.height ?? 900
+        return max(320, screen - (inWindow ? 56 : 28))
+    }
+}
+
+/// Shows its content at full height, and scrolls only when that is taller than `maxHeight`.
+struct FittingScroll<Content: View>: View {
+    let maxHeight: CGFloat
+    @ViewBuilder let content: () -> Content
+    @State private var contentHeight: CGFloat = PanelHeight.last
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: contentHeight > maxHeight) {
+            content()
+                .background(GeometryReader { geometry in
+                    Color.clear.preference(key: ContentHeightKey.self, value: geometry.size.height)
+                })
+        }
+        .frame(height: min(max(contentHeight, 1), maxHeight))
+        .onPreferenceChange(ContentHeightKey.self) { height in
+            MainActor.assumeIsolated {
+                guard height > 0, abs(height - contentHeight) > 0.5 else { return }
+                contentHeight = height
+                PanelHeight.last = height
+            }
+        }
+    }
+}
+
+/// The panel's last height, so the next panel opens at the right size.
+enum PanelHeight {
+    static var last: CGFloat = 560
+}
+
+private struct ContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
@@ -42,7 +101,7 @@ struct Overview: View {
     let inWindow: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             Header(state: state)
             if !state.summary.isEmpty {
                 MonthCard(summary: state.summary)
@@ -120,7 +179,7 @@ struct MonthCard: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.85))
             Text(Format.usd(summary.monthCost))
-                .font(.system(size: 34, weight: .semibold))
+                .font(.system(size: 32, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.white)
                 .lineLimit(1)
@@ -134,9 +193,10 @@ struct MonthCard: View {
                 Spacer()
                 CardFigure(label: "Last month", value: summary.lastMonthCost, alignment: .trailing)
             }
-            .padding(.top, 8)
+            .padding(.top, 6)
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -209,7 +269,7 @@ struct DailyChart: View {
                     }
                 }
             }
-            .frame(height: 56)
+            .frame(height: 48)
             HStack {
                 Text(days.first.map { Format.shortDay($0.day) } ?? "")
                 Spacer()

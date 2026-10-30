@@ -31,6 +31,14 @@ public final class ClaudeReader: LogReader {
         ClaudeReader.codeFolders(home: home) + [ClaudeReader.coworkFolder(home: home)]
     }
 
+    public func folders(for tool: Tool, home: String) -> [String] {
+        tool == .cowork ? [ClaudeReader.coworkFolder(home: home)] : ClaudeReader.codeFolders(home: home)
+    }
+
+    public func tool(for path: String, home: String) -> Tool {
+        path.hasPrefix(ClaudeReader.coworkFolder(home: home) + "/") ? .cowork : .claudeCode
+    }
+
     public func files(home: String) -> [String] {
         var out: [String] = []
         for folder in ClaudeReader.codeFolders(home: home) {
@@ -48,7 +56,7 @@ public final class ClaudeReader: LogReader {
     }
 
     public func parser(for path: String, home: String) -> LogParser {
-        ClaudeParser(tool: path.hasPrefix(ClaudeReader.coworkFolder(home: home) + "/") ? .cowork : .claudeCode)
+        ClaudeParser(tool: tool(for: path, home: home))
     }
 }
 

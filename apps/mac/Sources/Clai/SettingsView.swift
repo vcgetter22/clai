@@ -157,7 +157,7 @@ private struct SourceRow: View {
                     .truncationMode(.middle)
             }
             Spacer()
-            Text(source.found ? "\(Format.count(source.requests)) requests" : "not found")
+            Text(source.found ? Format.count(source.requests, "request") : "not found")
                 .font(.system(size: 11))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)

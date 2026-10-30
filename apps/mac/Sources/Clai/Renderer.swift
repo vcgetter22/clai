@@ -16,7 +16,7 @@ enum Renderer {
         ] {
             let scheme: ColorScheme = name == "dark" ? .dark : .light
             let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
-            let view = PanelView(state: state, context: .popover)
+            let view = PanelView(state: state, context: .image)
                 .environment(\.colorScheme, scheme)
                 .background(shape.fill(background))
                 .clipShape(shape)
