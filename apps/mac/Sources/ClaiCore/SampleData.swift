@@ -32,6 +32,8 @@ public enum SampleData {
             add(.codex, "gpt-6.1-sol", requests: 180, input: 3_500, output: 1_100, read: 48_000, write: 0)
             if offset % 3 == 0 { add(.gemini, "gemini-3.1-pro-preview", requests: 60, input: 9_000, output: 700, read: 30_000, write: 0) }
             if offset % 4 == 1 { add(.cowork, "claude-sonnet-5-5", requests: 90, input: 80, output: 700, read: 40_000, write: 1_800) }
+            if offset % 2 == 0 { add(.claudeCodeCloud, "claude-opus-5-5", requests: 140, input: 60, output: 950, read: 58_000, write: 2_600) }
+            add(.claudeApps, "claude-sonnet-5-5", requests: 30, input: 1_200, output: 900, read: 24_000, write: 3_000)
         }
         return Ledger(buckets: buckets)
     }
@@ -51,6 +53,13 @@ public enum SampleData {
         SourceStatus(tool: .qwen, folders: ["~/.qwen/projects"], files: 0, requests: 0),
         SourceStatus(tool: .opencode, folders: ["~/.local/share/opencode"], files: 0, requests: 0),
     ]
+
+    public static let claudeLimits = RateLimits(
+        primary: .init(usedPercent: 27, windowMinutes: 300, resetsAt: nil),
+        secondary: .init(usedPercent: 48, windowMinutes: 10_080, resetsAt: nil),
+        planType: nil,
+        observedAt: 0
+    )
 
     public static let codexLimits = RateLimits(
         primary: .init(usedPercent: 34, windowMinutes: 300, resetsAt: nil),

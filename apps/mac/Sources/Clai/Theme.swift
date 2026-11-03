@@ -20,6 +20,11 @@ enum Theme {
         case .gemini: return Color(light: 0x8B5CC7, dark: 0xB08BE6)
         case .qwen: return Color(light: 0x2A9D8F, dark: 0x5CC2B5)
         case .opencode: return Color(light: 0x5F6B78, dark: 0x9AA6B2)
+        // The cloud: Claude's colours, lighter for the sessions, deeper for the API.
+        case .claudeCodeCloud: return Color(light: 0xE0956F, dark: 0xF0B08F)
+        case .coworkCloud: return Color(light: 0xB98466, dark: 0xD9A88C)
+        case .claudeApps: return Color(light: 0xD4A017, dark: 0xE8BE4A)
+        case .claudeAPI: return Color(light: 0x7A4A2E, dark: 0xB57F5E)
         }
     }
 

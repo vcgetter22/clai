@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Checks the packaged app on this Mac: a universal, signed bundle for macOS 13 and later; a report
-# from sample logs with the expected total; the ledger it writes; a launch that stays up; and the
-# offscreen render of the panel.
+# from sample logs with the expected total; the ledger it writes; the status line command; a launch
+# that stays up; and the offscreen render of the panel.
 #
 #   apps/mac/scripts/build-app.sh && apps/mac/scripts/smoke-test.sh
 set -euo pipefail
@@ -45,6 +45,19 @@ grep -q 'so far: \$6.75 API-equivalent' <<<"$report" || fail "expected \$6.75 th
 grep -q 'Claude Code' <<<"$report" || fail "Claude Code missing"
 grep -q 'Codex' <<<"$report" || fail "Codex missing"
 test -s "$HOME_DIR/Library/Application Support/clai/ledger.json" || fail "the ledger was not written"
+
+step "Status line"
+# Claude Code runs `clai --status-line` with its status line JSON: clai saves the plan limits and
+# prints what the user's own status line command prints.
+SUPPORT="$HOME_DIR/Library/Application Support/clai"
+mkdir -p "$SUPPORT"
+printf '%s' '{"command":"clai --status-line","previous":"{\"type\":\"command\",\"command\":\"printf my-status-line\"}"}' > "$SUPPORT/claude-status-line.json"
+status='{"model":{"id":"claude-opus-5-5"},"rate_limits":{"five_hour":{"used_percentage":23.5,"resets_at":1893456000},"seven_day":{"used_percentage":41.2,"resets_at":1893456000}}}'
+out="$(printf '%s' "$status" | CLAI_HOME="$HOME_DIR" "$BIN" --status-line)"
+[[ "$out" == "my-status-line" ]] || fail "the status line printed '$out'"
+grep -q '"used":23.5' "$SUPPORT/claude-limits.json" || fail "the limits were not saved"
+CLAI_HOME="$HOME_DIR" "$BIN" --report | grep -q 'Claude limits: 24% of 300 min' || fail "the report has no Claude limits"
+echo "status line passed through, limits saved"
 
 step "Launch"
 CLAI_HOME="$HOME_DIR" "$BIN" &

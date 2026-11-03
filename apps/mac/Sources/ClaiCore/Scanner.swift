@@ -65,12 +65,16 @@ public struct ScanResult: Sendable {
     public var sources: [SourceStatus]
     /// Codex's latest plan limits, when its logs carry them.
     public var codexLimits: RateLimits?
+    /// When clai last read the organization's usage report, and how far the report was complete then.
+    public var cloudFetchedAt: Double?
+    public var cloudRefreshedAt: Double?
     /// Whether the logs held anything new since the last refresh.
     public var changed: Bool
     public var duration: Double
 }
 
-/// Reads every tool's logs, keeps one event per request, and maintains the ledger.
+/// Reads every tool's logs, keeps one event per request, and maintains the ledger. Adds the cloud
+/// usage of an organization's usage report (`cloud.json`), when one is connected.
 ///
 /// The first refresh reads every log from the start; later ones read only what was appended (or
 /// the documents that changed). Not thread safe: use one scanner from one queue at a time.
@@ -78,6 +82,7 @@ public final class UsageScanner: @unchecked Sendable {
     public let home: String
     public let readers: [LogReader]
     public let ledgerURL: URL?
+    public let cloudURL: URL?
 
     private struct FileState {
         var stamp: FileStamp
@@ -91,6 +96,11 @@ public final class UsageScanner: @unchecked Sendable {
     private var requestsPerTool: [Tool: Int] = [:]
     /// Read from disk on first use, on the scanner's queue.
     public private(set) lazy var ledger: Ledger = ledgerURL.map { Ledger.load(from: $0) } ?? Ledger()
+    /// The organization's usage report as last read; read from disk on first use.
+    public private(set) lazy var cloud: OrgUsageStore = cloudURL.map { OrgUsageStore.load(from: $0) } ?? OrgUsageStore()
+    /// The report's usage beyond this Mac's logs, worked out again when either changes.
+    private var cloudLines: [BucketKey: BucketValue] = [:]
+    private var cloudIsStale = true
     /// Seconds between writes of the ledger. What is not written yet is still in the logs, which
     /// the next launch reads again, so a later write loses nothing.
     public var saveInterval: Double = 300
@@ -104,16 +114,40 @@ public final class UsageScanner: @unchecked Sendable {
     private var completeSince: [Tool: Double] = [:]
     private var days = DayResolver(timeZone: TimeZone(identifier: "UTC")!)
 
-    public init(home: String, readers: [LogReader] = LogReaders.all, ledgerURL: URL?) {
+    public init(home: String, readers: [LogReader] = LogReaders.all, ledgerURL: URL?, cloudURL: URL? = nil) {
         self.home = home
         self.readers = readers
         self.ledgerURL = ledgerURL
+        self.cloudURL = cloudURL
     }
 
     /// The summary from the stored ledger alone: what the panel shows before the first read.
     public func storedSummary(pricer: Pricer, now: Date = Date(), timeZone: TimeZone = .current) -> Summary {
         useTimeZone(timeZone)
-        return Summary.make(ledger: ledger, pricer: pricer, now: now.timeIntervalSince1970, days: &days)
+        return Summary.make(ledger: withCloud(), pricer: pricer, now: now.timeIntervalSince1970, days: &days)
+    }
+
+    /// Takes in a fresh read of the organization's usage report and saves it. On the scanner's queue.
+    public func updateCloud(from start: Double, to end: Double, rows: [OrgRow], refreshedAt: Double?, at now: Double, full: Bool) {
+        cloud.replace(from: start, to: end, with: rows, refreshedAt: refreshedAt, at: now, full: full)
+        if let cloudURL { try? cloud.save(to: cloudURL) }
+        cloudIsStale = true
+    }
+
+    /// Forgets the organization's usage (disconnected). On the scanner's queue.
+    public func clearCloud() {
+        cloud = OrgUsageStore()
+        if let cloudURL { try? FileManager.default.removeItem(at: cloudURL) }
+        cloudIsStale = true
+    }
+
+    /// The ledger with the report's usage beyond this Mac's logs added.
+    private func withCloud() -> Ledger {
+        if cloudIsStale {
+            cloudLines = cloud.derived(local: ledger)
+            cloudIsStale = false
+        }
+        return ledger.adding(cloudLines)
     }
 
     /// Days are worked out in the time zone the Mac is in now; the resolver caches its offsets.
@@ -199,7 +233,10 @@ public final class UsageScanner: @unchecked Sendable {
         let pricesKey = pricer.list.version + "|\(pricer.list.models.count)"
         if changed || liveIsDirty || pricesKey != lastPrices || timeZone.identifier != lastTimeZone {
             let live = Ledger.buckets(from: Array(events.values), pricer: pricer, days: &days)
-            if ledger.merge(live: live, completeSince: completeSince) { unsaved = true }
+            if ledger.merge(live: live, completeSince: completeSince) {
+                unsaved = true
+                cloudIsStale = true
+            }
             liveIsDirty = false
             lastPrices = pricesKey
             lastTimeZone = timeZone.identifier
@@ -213,11 +250,13 @@ public final class UsageScanner: @unchecked Sendable {
             lastSave = Date()
         }
 
-        let summary = Summary.make(ledger: ledger, pricer: pricer, now: now.timeIntervalSince1970, days: &days)
+        let summary = Summary.make(ledger: withCloud(), pricer: pricer, now: now.timeIntervalSince1970, days: &days)
         return ScanResult(
             summary: summary,
             sources: sourceStatus(),
             codexLimits: latestCodexLimits(),
+            cloudFetchedAt: cloud.fetchedAt,
+            cloudRefreshedAt: cloud.refreshedAt,
             changed: changed,
             duration: Date().timeIntervalSince(started)
         )

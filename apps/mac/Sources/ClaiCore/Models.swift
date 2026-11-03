@@ -9,8 +9,9 @@ public enum Vendor: String, Codable, Sendable, CaseIterable {
     case other
 }
 
-/// The AI tools whose local logs clai reads. Raw values are stored in the ledger file, so they
-/// never change.
+/// Where usage comes from: the AI tools whose local logs clai reads, and the products Anthropic's
+/// usage report covers for an organization (`isCloud`). Raw values are stored in the ledger and
+/// cloud files, so they never change.
 public enum Tool: String, Codable, Sendable, CaseIterable, Comparable {
     case claudeCode = "claude-code"
     case cowork = "claude-cowork"
@@ -18,6 +19,15 @@ public enum Tool: String, Codable, Sendable, CaseIterable, Comparable {
     case gemini = "gemini-cli"
     case qwen = "qwen-code"
     case opencode = "opencode"
+    /// Claude Code in an organization's usage report beyond this Mac's logs: cloud sessions and
+    /// other computers.
+    case claudeCodeCloud = "claude-code-cloud"
+    /// Claude Cowork in an organization's usage report beyond this Mac's logs.
+    case coworkCloud = "claude-cowork-cloud"
+    /// claude.ai chat and the other Claude apps (Design, Chrome, Slack, Office) in an organization's report.
+    case claudeApps = "claude-apps"
+    /// The Claude API (Messages, Batches, Managed Agents, the Console) in an organization's report.
+    case claudeAPI = "claude-api"
 
     public var name: String {
         switch self {
@@ -27,17 +37,36 @@ public enum Tool: String, Codable, Sendable, CaseIterable, Comparable {
         case .gemini: return "Gemini CLI"
         case .qwen: return "Qwen Code"
         case .opencode: return "OpenCode"
+        case .claudeCodeCloud: return "Claude Code (cloud)"
+        case .coworkCloud: return "Claude Cowork (cloud)"
+        case .claudeApps: return "Claude apps"
+        case .claudeAPI: return "Claude API"
         }
     }
 
-    /// The vendor whose plan pays for this tool's usage, when there is one.
+    /// Who makes the models the tool uses.
     public var vendor: Vendor {
         switch self {
-        case .claudeCode, .cowork: return .anthropic
+        case .claudeCode, .cowork, .claudeCodeCloud, .coworkCloud, .claudeApps, .claudeAPI: return .anthropic
         case .codex: return .openai
         case .gemini: return .google
         case .qwen, .opencode: return .other
         }
+    }
+
+    /// Usage from Anthropic's usage report for an organization, not from a log on this Mac.
+    public var isCloud: Bool {
+        switch self {
+        case .claudeCodeCloud, .coworkCloud, .claudeApps, .claudeAPI: return true
+        default: return false
+        }
+    }
+
+    /// The vendor whose personal plan pays for this tool's usage, for plan value. An organization's
+    /// usage is billed to the organization (per token, or by its Enterprise plan), not to a Pro or
+    /// Max plan, so cloud tools have none.
+    public var planVendor: Vendor? {
+        isCloud ? nil : vendor
     }
 
     public static func < (lhs: Tool, rhs: Tool) -> Bool {

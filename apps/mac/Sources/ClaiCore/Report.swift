@@ -3,7 +3,7 @@ import Foundation
 /// `clai --report`: what clai reads and counts, as plain text. For checking an installation and for
 /// bug reports; it prints the same numbers as the panel and nothing from inside the logs.
 public enum Report {
-    public static func text(_ result: ScanResult, version: String, prices: PriceList) -> String {
+    public static func text(_ result: ScanResult, version: String, prices: PriceList, claudeLimits: RateLimits? = nil) -> String {
         let s = result.summary
         var out: [String] = []
         out.append("clai \(version) · prices of \(prices.version) · read in \(String(format: "%.2f", result.duration)) s")
@@ -40,12 +40,25 @@ public enum Report {
             let state = source.found ? "\(Format.count(source.files, "file")), \(Format.count(source.requests, "request"))" : "not found"
             out.append("  " + pad(source.tool.name, 16) + pad(state, 34) + source.folders.joined(separator: ", "))
         }
+        if let fetched = result.cloudFetchedAt {
+            out.append("  " + pad("Anthropic usage report", 34) + "read \(OrgUsage.iso(fetched))"
+                       + (result.cloudRefreshedAt.map { ", complete until \(OrgUsage.iso($0))" } ?? ""))
+        }
+        if let limits = claudeLimits {
+            out.append("")
+            out.append("Claude limits: " + limitWindows(limits) + " (as of \(OrgUsage.iso(limits.observedAt)))")
+        }
         if let limits = result.codexLimits {
             out.append("")
-            let windows = [limits.primary, limits.secondary].compactMap { $0 }.map { "\(Int($0.usedPercent.rounded()))% of \($0.windowMinutes.map { "\($0) min" } ?? "?")" }
-            out.append("Codex limits: " + windows.joined(separator: ", ") + (limits.planType.map { " (\($0))" } ?? ""))
+            out.append("Codex limits: " + limitWindows(limits) + (limits.planType.map { " (\($0))" } ?? ""))
         }
         return out.joined(separator: "\n") + "\n"
+    }
+
+    private static func limitWindows(_ limits: RateLimits) -> String {
+        [limits.primary, limits.secondary].compactMap { $0 }
+            .map { "\(Int($0.usedPercent.rounded()))% of \($0.windowMinutes.map { "\($0) min" } ?? "?")" }
+            .joined(separator: ", ")
     }
 
     private static func pad(_ text: String, _ width: Int, right: Bool = false) -> String {

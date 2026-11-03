@@ -42,6 +42,17 @@ final class AppState: ObservableObject {
     @Published private(set) var loginItemNote: String? = nil
     @Published var page: Page = .overview
 
+    /// Claude's plan limits, as Claude Code last passed them to clai's status line command.
+    @Published private(set) var claudeLimits: RateLimits? = nil
+    /// Whether Claude Code's status line runs clai's command.
+    @Published private(set) var statusLineConnected = false
+    @Published private(set) var statusLineNote: String? = nil
+    /// The organization whose usage report clai reads, if any.
+    @Published private(set) var org: OrgConnection? = nil
+    @Published private(set) var orgBusy = false
+    @Published private(set) var orgError: String? = nil
+    @Published private(set) var orgFetchedAt: Date? = nil
+
     @Published var figure: MenuBarFigure {
         didSet {
             defaults.set(figure.rawValue, forKey: Keys.figure)
@@ -72,6 +83,10 @@ final class AppState: ObservableObject {
     private var watcher: LogWatcher?
     private var timers: [Timer] = []
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
+    private var lastOrgAttempt: Double?
+    /// Counts connection changes, so a read of the report that was under way for an older
+    /// connection is not taken in.
+    private var orgGeneration = 0
 
     private enum Keys {
         static let figure = "menuBarFigure"
@@ -100,6 +115,14 @@ final class AppState: ObservableObject {
     }
 
     private static var pricesFile: URL { supportFolder.appendingPathComponent("prices.json") }
+    /// The organization's usage report as clai last read it.
+    static var cloudFile: URL { supportFolder.appendingPathComponent("cloud.json") }
+    /// The organization and its key (readable by this user only).
+    static var orgFile: URL { supportFolder.appendingPathComponent("anthropic-org.json") }
+    /// Claude's plan limits, written by `clai --status-line`.
+    static var claudeLimitsFile: URL { supportFolder.appendingPathComponent("claude-limits.json") }
+    /// The status line setting clai replaced in Claude Code's settings.
+    static var statusLineFile: URL { supportFolder.appendingPathComponent("claude-status-line.json") }
 
     init(sample: Bool = false) {
         let list = AppState.storedPrices()
@@ -114,7 +137,8 @@ final class AppState: ObservableObject {
             summary = SampleData.summary(pricer: pricer)
         } else {
             // The ledger is loaded on the scan queue; the first read shows what it knows at once.
-            scanner = UsageScanner(home: AppState.home, ledgerURL: AppState.supportFolder.appendingPathComponent("ledger.json"))
+            scanner = UsageScanner(home: AppState.home, ledgerURL: AppState.supportFolder.appendingPathComponent("ledger.json"),
+                                   cloudURL: AppState.cloudFile)
             var days = DayResolver(timeZone: .current)
             summary = .empty(today: days.day(at: Date().timeIntervalSince1970))
         }
@@ -123,6 +147,7 @@ final class AppState: ObservableObject {
         if sample {
             sources = SampleData.sources
             codexLimits = SampleData.codexLimits
+            claudeLimits = SampleData.claudeLimits
             plans = [.anthropic: "claude-max-5x", .openai: "chatgpt-pro-200"]
             hasScanned = true
             lastScan = Date().addingTimeInterval(-40)
@@ -132,6 +157,8 @@ final class AppState: ObservableObject {
                 if let id = UserDefaults.standard.string(forKey: Keys.plan(vendor)) { stored[vendor] = id }
             }
             plans = stored
+            org = OrgConnection.load(from: AppState.orgFile)
+            claudeLimits = ClaudeLimits.load(from: AppState.claudeLimitsFile)
         }
         updateTitle()
     }
@@ -153,10 +180,15 @@ final class AppState: ObservableObject {
             MainActor.assumeIsolated { self?.refreshSoon(after: 10) }
         }
 
-        // A safety net in case a change went unnoticed, and the daily online check.
+        // A safety net in case a change went unnoticed, the daily online check and the
+        // organization's usage report (read every 30 minutes; Anthropic updates it a few hours late).
         addTimer(every: 300) { $0.refresh() }
         addTimer(every: 3600) { $0.checkOnlineIfDue() }
-        observe(NSWorkspace.shared.notificationCenter, NSWorkspace.didWakeNotification) { $0.refreshSoon(after: 5) }
+        addTimer(every: 600) { $0.syncOrgIfDue() }
+        observe(NSWorkspace.shared.notificationCenter, NSWorkspace.didWakeNotification) { state in
+            state.refreshSoon(after: 5)
+            state.syncOrgIfDue()
+        }
         observe(NotificationCenter.default, .NSCalendarDayChanged) { $0.refresh() }
         observe(NotificationCenter.default, .NSSystemTimeZoneDidChange) { state in
             NSTimeZone.resetSystemTimeZone()
@@ -164,6 +196,8 @@ final class AppState: ObservableObject {
         }
         checkOnlineIfDue()
         restoreLoginItem()
+        readStatusLine()
+        syncOrgIfDue()
     }
 
     private func addTimer(every seconds: TimeInterval, _ action: @escaping @MainActor (AppState) -> Void) {
@@ -248,6 +282,11 @@ final class AppState: ObservableObject {
         if result.summary != summary { summary = result.summary }
         if result.sources != sources { sources = result.sources }
         if result.codexLimits != codexLimits { codexLimits = result.codexLimits }
+        let fetched = result.cloudFetchedAt.map { Date(timeIntervalSince1970: $0) }
+        if org != nil, fetched != orgFetchedAt { orgFetchedAt = fetched }
+        // clai's status line command writes the limits while Claude Code runs, and its logs change then too.
+        let limits = ClaudeLimits.load(from: AppState.claudeLimitsFile)
+        if limits != claudeLimits { claudeLimits = limits }
         lastScan = Date()
         hasScanned = true
         scanning = false
@@ -284,6 +323,178 @@ final class AppState: ObservableObject {
     func setPlan(_ id: String?, for vendor: Vendor) {
         plans[vendor] = id
         defaults.set(id, forKey: Keys.plan(vendor))
+    }
+
+    // MARK: Claude in the cloud: an organization's usage report
+
+    /// Checks the key with a day of the report, then keeps it and reads the rest.
+    func connectOrg(key: String, onlyEmail: String) {
+        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, !orgBusy, !isSample else { return }
+        let email = OrgConnection.clean(onlyEmail)
+        orgBusy = true
+        orgError = nil
+        orgGeneration += 1
+        let client = OrgUsageClient(key: key, userAgent: AppState.userAgent)
+        Task { @MainActor in
+            do {
+                let now = Date().timeIntervalSince1970
+                _ = try await client.usage(from: now - 86_400, to: now, onlyEmail: email, now: now)
+                let connection = OrgConnection(key: key, onlyEmail: email)
+                try connection.save(to: AppState.orgFile)
+                org = connection
+                orgBusy = false
+                syncOrgIfDue(force: true)
+            } catch {
+                orgBusy = false
+                orgError = AppState.describe(error)
+            }
+        }
+    }
+
+    func disconnectOrg() {
+        orgGeneration += 1
+        org = nil
+        orgError = nil
+        orgFetchedAt = nil
+        orgBusy = false
+        try? FileManager.default.removeItem(at: AppState.orgFile)
+        guard let scanner else { return }
+        queue.async {
+            scanner.clearCloud()
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self.refresh() }
+            }
+        }
+    }
+
+    /// Counts one person's usage only (their e-mail address in the organization), or everyone's.
+    func setOrgEmail(_ email: String) {
+        guard var connection = org else { return }
+        connection.onlyEmail = OrgConnection.clean(email)
+        guard connection != org else { return }
+        try? connection.save(to: AppState.orgFile)
+        org = connection
+        orgGeneration += 1
+        orgBusy = false
+        // What is stored was read for someone else: read it all again.
+        if let scanner { queue.async { scanner.clearCloud() } }
+        syncOrgIfDue(force: true)
+    }
+
+    /// Reads the report when due: every 30 minutes the last three days, twice a day all of last
+    /// month and this one (late usage and corrections arrive for days).
+    func syncOrgIfDue(force: Bool = false) {
+        guard let connection = org, let scanner, !isSample, !orgBusy else { return }
+        let now = Date().timeIntervalSince1970
+        if !force, let last = lastOrgAttempt, now - last < 29 * 60 { return }
+        lastOrgAttempt = now
+        orgBusy = true
+        let generation = orgGeneration
+        let client = OrgUsageClient(key: connection.key, userAgent: AppState.userAgent)
+        let queue = self.queue
+        Task { @MainActor in
+            let range = await withCheckedContinuation { (continuation: CheckedContinuation<(start: Double, end: Double, full: Bool), Never>) in
+                queue.async { continuation.resume(returning: scanner.cloud.nextRange(now: now)) }
+            }
+            do {
+                let result = try await client.usage(from: range.start, to: range.end, onlyEmail: connection.onlyEmail, now: now)
+                guard generation == orgGeneration else { return }
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    queue.async {
+                        scanner.updateCloud(from: range.start, to: range.end, rows: result.rows, refreshedAt: result.refreshedAt, at: now, full: range.full)
+                        continuation.resume()
+                    }
+                }
+                guard generation == orgGeneration else { return }
+                orgBusy = false
+                orgError = nil
+                orgFetchedAt = Date(timeIntervalSince1970: now)
+                refresh()
+            } catch {
+                guard generation == orgGeneration else { return }
+                orgBusy = false
+                orgError = AppState.describe(error)
+            }
+        }
+    }
+
+    private static var userAgent: String { "clai/\(AppVersion.current) (https://getclai.vercel.app)" }
+
+    private static func describe(_ error: Error) -> String {
+        (error as? OrgUsageError ?? .offline(error.localizedDescription)).message
+    }
+
+    // MARK: Claude in the cloud: plan limits through Claude Code's status line
+
+    /// Claude Code's user settings, unless they are a link into a folder macOS guards (reading
+    /// it would make macOS ask for access).
+    private static func claudeSettingsPath() -> String? {
+        let path = ClaudeStatusLine.settingsPath(home: home)
+        var info = stat()
+        if lstat(path, &info) == 0 { return FileFinder.isSafe(path) ? path : nil }
+        let folder = (path as NSString).deletingLastPathComponent
+        if lstat(folder, &info) == 0 { return FileFinder.isSafe(folder) ? path : nil }
+        return FileFinder.isSafe(home) ? path : nil
+    }
+
+    /// Whether Claude Code's status line runs clai; points it at this copy of clai when clai moved.
+    private func readStatusLine() {
+        guard let path = AppState.claudeSettingsPath() else { return }
+        let text = try? String(contentsOfFile: path, encoding: .utf8)
+        let current = ClaudeStatusLine.currentCommand(in: text)
+        statusLineConnected = ClaudeStatusLine.isClai(current)
+        if statusLineConnected, AppVersion.isInApplications, let executable = Bundle.main.executablePath,
+           current != ClaudeStatusLine.command(executable: executable) {
+            connectStatusLine()
+        }
+    }
+
+    func connectStatusLine() {
+        guard !isSample, let executable = Bundle.main.executablePath else { return }
+        guard let path = AppState.claudeSettingsPath() else {
+            statusLineNote = "Claude Code's settings file is in a folder macOS protects, so clai leaves it alone."
+            return
+        }
+        let text = try? String(contentsOfFile: path, encoding: .utf8)
+        do {
+            let (updated, installed) = try ClaudeStatusLine.connect(executable: executable, settings: text,
+                                                                     remembered: ClaudeStatusLine.Installed.load(from: AppState.statusLineFile))
+            // What it replaced is saved first, so clai's command can run it from the first update on.
+            try installed.save(to: AppState.statusLineFile)
+            try AppState.writeSettings(updated, to: path)
+            statusLineConnected = true
+            statusLineNote = nil
+        } catch ClaudeStatusLine.EditError.notAnObject {
+            statusLineNote = "~/.claude/settings.json is not plain JSON, so clai leaves it alone."
+        } catch {
+            statusLineNote = "clai could not change ~/.claude/settings.json: \(error.localizedDescription)"
+        }
+    }
+
+    func disconnectStatusLine() {
+        if let path = AppState.claudeSettingsPath(), let text = try? String(contentsOfFile: path, encoding: .utf8),
+           let restored = ClaudeStatusLine.disconnect(settings: text, remembered: ClaudeStatusLine.Installed.load(from: AppState.statusLineFile)) {
+            do {
+                try AppState.writeSettings(restored, to: path)
+            } catch {
+                statusLineNote = "clai could not change ~/.claude/settings.json: \(error.localizedDescription)"
+                return
+            }
+        }
+        try? FileManager.default.removeItem(at: AppState.statusLineFile)
+        try? FileManager.default.removeItem(at: AppState.claudeLimitsFile)
+        claudeLimits = nil
+        statusLineConnected = false
+        statusLineNote = nil
+    }
+
+    /// Writes Claude Code's settings in place of the file a link points to, so a linked settings
+    /// file (dotfiles) stays a link.
+    private static func writeSettings(_ text: String, to path: String) throws {
+        let target = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try text.write(to: target, atomically: true, encoding: .utf8)
     }
 
     // MARK: Online, once a day
@@ -388,5 +599,35 @@ enum Online {
                 MainActor.assumeIsolated { done(data) }
             }
         }.resume()
+    }
+}
+
+/// The organization whose usage report clai reads: its Admin API key (Claude Console) or Analytics
+/// API key (Claude Enterprise), and whose usage to count. Kept in `anthropic-org.json`, readable by
+/// this user only; clai uses the key for nothing but `GET /v1/organizations/analytics/usage`.
+struct OrgConnection: Codable, Equatable {
+    var key: String
+    /// Count only the usage attributed to this address; nil for the whole organization.
+    var onlyEmail: String?
+
+    /// The key's last four characters, to tell keys apart.
+    var keyHint: String { "…" + key.suffix(4) }
+
+    static func clean(_ email: String) -> String? {
+        let value = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    static func load(from url: URL) -> OrgConnection? {
+        guard let data = try? Data(contentsOf: url), let connection = try? JSONDecoder().decode(OrgConnection.self, from: data),
+              !connection.key.isEmpty else { return nil }
+        return connection
+    }
+
+    func save(to url: URL) throws {
+        let files = FileManager.default
+        try files.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(self).write(to: url, options: .atomic)
+        try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 }

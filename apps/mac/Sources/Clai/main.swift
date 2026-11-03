@@ -3,12 +3,21 @@ import ClaiCore
 
 // The program starts on the main thread; everything below runs there.
 MainActor.assumeIsolated {
+    // `clai --status-line`: Claude Code's status line command once connected in Settings. Saves
+    // Claude's plan limits, runs the user's own status line command and quits, before any AppKit.
+    if CommandLine.arguments.contains(ClaudeStatusLine.flag) {
+        let input = FileHandle.standardInput.readDataToEndOfFile()
+        exit(StatusLineRunner.run(input: input, limitsURL: AppState.claudeLimitsFile, installedURL: AppState.statusLineFile))
+    }
+
     // `clai --report`: read the logs, print what clai counts, and quit (no window, no menu bar item).
     if CommandLine.arguments.contains("--report") {
         let prices = AppState.storedPrices()
-        let scanner = UsageScanner(home: AppState.home, ledgerURL: AppState.supportFolder.appendingPathComponent("ledger.json"))
+        let scanner = UsageScanner(home: AppState.home, ledgerURL: AppState.supportFolder.appendingPathComponent("ledger.json"),
+                                   cloudURL: AppState.cloudFile)
         let result = scanner.refresh(pricer: Pricer(list: prices))
-        print(Report.text(result, version: AppVersion.current, prices: prices), terminator: "")
+        print(Report.text(result, version: AppVersion.current, prices: prices, claudeLimits: ClaudeLimits.load(from: AppState.claudeLimitsFile)),
+              terminator: "")
         exit(0)
     }
 

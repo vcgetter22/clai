@@ -10,13 +10,17 @@ public struct BucketKey: Hashable, Sendable {
     public var long: Bool
     /// Requests in Claude Code's fast mode.
     public var fast: Bool
+    /// Message Batches API requests, billed at half the standard price (cloud usage only; never
+    /// stored in the ledger file).
+    public var batch: Bool
 
-    public init(quarter: Quarter, tool: Tool, model: String, long: Bool = false, fast: Bool = false) {
+    public init(quarter: Quarter, tool: Tool, model: String, long: Bool = false, fast: Bool = false, batch: Bool = false) {
         self.quarter = quarter
         self.tool = tool
         self.model = model
         self.long = long
         self.fast = fast
+        self.batch = batch
     }
 
     var slot: Slot { Slot(quarter: quarter, tool: tool) }
@@ -121,6 +125,15 @@ public struct Ledger: Sendable, Equatable {
         buckets = next
         readers = Ledger.readersVersion
         return changed
+    }
+
+    /// This ledger with more lines added, for the summary: the cloud usage derived from an
+    /// organization's usage report, which is kept in its own file.
+    public func adding(_ extra: [BucketKey: BucketValue]) -> Ledger {
+        guard !extra.isEmpty else { return self }
+        var out = self
+        for (key, value) in extra { out.buckets[key, default: BucketValue()].merge(value) }
+        return out
     }
 
     // MARK: Storage

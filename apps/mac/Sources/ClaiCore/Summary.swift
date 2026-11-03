@@ -75,7 +75,7 @@ public struct Summary: Sendable, Equatable {
     /// This month by tool and by model, most expensive first.
     public var tools: [ToolTotal]
     public var models: [ModelTotal]
-    /// This month's cost per vendor, for plan value.
+    /// This month's cost per vendor of the tools a personal plan pays for, for plan value.
     public var vendorMonthCost: [Vendor: Double]
     /// The last day with any usage, nil before the first.
     public var lastUsageDay: Day?
@@ -132,7 +132,7 @@ public struct Summary: Sendable, Equatable {
             monthUnpriced += unpriced
             monthTokens += value.tokens.total
             monthRequests += value.requests
-            vendors[key.tool.vendor, default: 0] += cost
+            if let vendor = key.tool.planVendor { vendors[vendor, default: 0] += cost }
 
             var tool = tools[key.tool] ?? ToolTotal(tool: key.tool, cost: 0, tokens: 0, requests: 0, unpricedRequests: 0)
             tool.cost += cost
@@ -182,8 +182,9 @@ public struct Summary: Sendable, Equatable {
     /// The cost of one ledger line and how it was priced.
     static func price(_ key: BucketKey, _ value: BucketValue, on day: Day, pricer: Pricer) -> (Double, PriceBasis) {
         if let match = pricer.match(key.model) {
-            let cost = match.price(on: day).cost(of: value.tokens, long: key.long, fast: key.fast)
-                + Double(value.webSearches) * pricer.list.webSearchPer1k / 1000
+            // Message Batches requests cost half the standard price; web searches do not change.
+            let tokens = match.price(on: day).cost(of: value.tokens, long: key.long, fast: key.fast) * (key.batch ? 0.5 : 1)
+            let cost = tokens + Double(value.webSearches) * pricer.list.webSearchPer1k / 1000
             return (cost, match.exact ? .listed : .estimated(like: match.name))
         }
         if value.loggedCost > 0 { return (value.loggedCost, .logged) }

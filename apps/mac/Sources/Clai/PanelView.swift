@@ -108,8 +108,12 @@ struct Overview: View {
                 DailyChart(days: state.summary.days)
                 Breakdown(summary: state.summary)
                 PlanValue(state: state)
+                if let limits = state.claudeLimits, limits.isCurrent || state.isSample {
+                    LimitsRow(title: "Claude plan limits", limits: limits)
+                        .help("Your whole plan: claude.ai, the Claude apps, cloud sessions and Claude Code, as Claude Code last saw it.")
+                }
                 if let limits = state.codexLimits, limits.isCurrent || state.isSample {
-                    LimitsRow(limits: limits)
+                    LimitsRow(title: "Codex plan limits", limits: limits)
                 }
             } else if state.hasScanned {
                 EmptyState(sources: state.sources)
@@ -457,12 +461,13 @@ struct PlanValue: View {
 }
 
 struct LimitsRow: View {
+    let title: String
     let limits: RateLimits
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Codex plan limits")
+                Text(title)
                     .font(.system(size: 12.5, weight: .medium))
                 Spacer()
                 if limits.observedAt > 0 {
@@ -557,7 +562,7 @@ struct EmptyState: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Chats on claude.ai, chatgpt.com or gemini.google.com, and agents that run in the cloud, keep no logs on your Mac.")
+            Text("Chats on claude.ai and cloud sessions keep no logs on your Mac. Settings can add your Claude plan limits, which count them, and an organization's usage report. ChatGPT and Gemini on the web are not counted.")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

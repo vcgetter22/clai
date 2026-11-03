@@ -25,6 +25,24 @@ struct SettingsPage: View {
                 }
             }
 
+            SettingsSection(title: "Claude plan limits",
+                            caption: "Pro and Max limits count everything: claude.ai, the Claude apps, cloud sessions and Claude Code. Claude Code hands them to its status line; clai adds itself there, runs your own status line as before, and shows the limits while you use Claude Code in Terminal.") {
+                SwitchRow(title: "Show Claude plan limits", isOn: Binding(
+                    get: { state.statusLineConnected },
+                    set: { on in
+                        if on { state.connectStatusLine() } else { state.disconnectStatusLine() }
+                    }
+                ))
+                .disabled(state.isSample)
+                if let note = state.statusLineNote {
+                    WarningText(text: note)
+                }
+            }
+
+            SettingsSection(title: "Organization usage report") {
+                OrgSettings(state: state)
+            }
+
             SettingsSection(title: "General") {
                 SwitchRow(title: "Open clai at login", isOn: Binding(get: { state.launchAtLogin }, set: { state.setLaunchAtLogin($0) }))
                     .disabled(!AppVersion.isInApplications)
@@ -113,6 +131,86 @@ private struct Caption: View {
             .font(.system(size: 11))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct WarningText: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(Theme.warning)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Anthropic's usage report for a Claude Console or Claude Enterprise organization: the key,
+/// whose usage counts, and how the last read went.
+private struct OrgSettings: View {
+    @ObservedObject var state: AppState
+    @State private var key = ""
+    @State private var email = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let org = state.org {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Connected with key \(org.keyHint)")
+                            .font(.system(size: 12.5))
+                        Text(readLine)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Disconnect") {
+                        key = ""
+                        email = ""
+                        state.disconnectOrg()
+                    }
+                    .controlSize(.small)
+                }
+                HStack(spacing: 6) {
+                    TextField("Your e-mail address", text: $email)
+                        .textFieldStyle(.roundedBorder)
+                        .controlSize(.small)
+                        .onSubmit { state.setOrgEmail(email) }
+                    Button("Apply") { state.setOrgEmail(email) }
+                        .controlSize(.small)
+                        .disabled(OrgConnection.clean(email) == org.onlyEmail)
+                }
+                Caption(org.onlyEmail.map { "Counting the usage of \($0) only. Clear the address to count everyone." }
+                        ?? "Counting everyone in the organization. Enter your address to count your own usage only.")
+            } else {
+                SecureField("Admin API key or Analytics API key", text: $key)
+                    .textFieldStyle(.roundedBorder)
+                    .controlSize(.small)
+                    .onSubmit(connect)
+                HStack(spacing: 12) {
+                    Button(state.orgBusy ? "Checking…" : "Connect", action: connect)
+                        .controlSize(.small)
+                        .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.orgBusy || state.isSample)
+                    LinkButton(title: "Console admin key", url: "https://platform.claude.com/settings/admin-keys")
+                    LinkButton(title: "Enterprise key", url: "https://claude.ai/admin-settings/api-access")
+                }
+                Caption("Prices what an organization uses beyond this Mac: claude.ai, cloud sessions, Cowork, Claude Design, Slack and the API. Paste an Admin API key (Claude Console) or an Analytics API key (Claude Enterprise). The key stays in clai's folder on this Mac and is used only to read the report from api.anthropic.com every 30 minutes.")
+            }
+            if let error = state.orgError {
+                WarningText(text: error)
+            }
+        }
+        .onAppear { email = state.org?.onlyEmail ?? "" }
+    }
+
+    private var readLine: String {
+        if state.orgBusy { return "Reading the usage report…" }
+        guard let fetched = state.orgFetchedAt else { return "Not read yet" }
+        return "Read \(Format.relative(fetched)) · Anthropic reports usage hours late"
+    }
+
+    private func connect() {
+        state.connectOrg(key: key, onlyEmail: "")
     }
 }
 

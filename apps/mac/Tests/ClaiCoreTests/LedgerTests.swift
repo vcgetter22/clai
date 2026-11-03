@@ -221,7 +221,7 @@ final class LedgerTests: XCTestCase {
         XCTAssertEqual(result.summary.monthCost, 0)
         XCTAssertEqual(result.summary.days.count, 30)
         XCTAssertTrue(result.sources.allSatisfy { !$0.found })
-        XCTAssertEqual(Set(result.sources.map(\.tool)), Set(Tool.allCases))
+        XCTAssertEqual(Set(result.sources.map(\.tool)), Set(Tool.allCases.filter { !$0.isCloud }))
     }
 }
 
@@ -231,7 +231,7 @@ final class SampleDataTests: XCTestCase {
         XCTAssertGreaterThan(summary.monthCost, 300)
         XCTAssertLessThan(summary.monthCost, 5_000)
         XCTAssertEqual(summary.tools.first?.tool, .claudeCode)
-        XCTAssertEqual(Set(summary.tools.map(\.tool)), [.claudeCode, .codex, .gemini, .cowork])
+        XCTAssertEqual(Set(summary.tools.map(\.tool)), [.claudeCode, .codex, .gemini, .cowork, .claudeCodeCloud, .claudeApps])
         XCTAssertTrue(summary.models.allSatisfy { $0.basis == .listed })
         XCTAssertGreaterThan(summary.lastMonthCost, 0)
         XCTAssertNotNil(summary.projectedMonthCost)
