@@ -33,9 +33,14 @@ struct SettingsPage: View {
                         if on { state.connectStatusLine() } else { state.disconnectStatusLine() }
                     }
                 ))
-                .disabled(state.isSample)
+                // Claude Code runs clai from where it is now, so not from a disk image or Downloads.
+                .disabled(state.isSample || (!state.statusLineConnected && !AppVersion.isInApplications))
                 if let note = state.statusLineNote {
                     WarningText(text: note)
+                } else if !state.statusLineConnected && !AppVersion.isInApplications && !state.isSample {
+                    Caption("Available once clai is in your Applications folder.")
+                } else if state.statusLineConnected && state.claudeLimits == nil {
+                    Caption("Waiting for Claude Code: the limits arrive with its next reply in Terminal, on a Pro, Max or Ultra plan.")
                 }
             }
 

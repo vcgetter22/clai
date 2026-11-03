@@ -104,6 +104,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Only for apps/mac/release-notes/<version>.md, what is new in this version.
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: apps/mac/release-notes
       - uses: actions/download-artifact@v4
         with:
           name: clai-mac
@@ -115,8 +119,12 @@ jobs:
         run: |
           VERSION="${TAG#mac-v}"
           {
-            echo "clai for Mac $VERSION: your AI usage in the menu bar, priced at API list prices from the logs Claude Code, Codex, Gemini CLI, Qwen Code and OpenCode keep on your Mac. Usage data stays on your Mac."
+            echo "clai for Mac $VERSION: your AI usage in the menu bar, priced at API list prices from the logs Claude Code, Codex, Gemini CLI, Qwen Code and OpenCode keep on your Mac, with Claude's plan limits and an organization's usage report from Anthropic. Usage data stays on your Mac."
             echo
+            if [ -f "apps/mac/release-notes/$VERSION.md" ]; then
+              cat "apps/mac/release-notes/$VERSION.md"
+              echo
+            fi
             echo "**Download:** [clai-mac.dmg](https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/clai-mac.dmg) (Apple silicon and Intel, macOS 13 or later), or from https://getclai.vercel.app"
             echo
             echo "**First launch.** This build is not notarized by Apple yet, so macOS says it cannot check clai for malware. Click Done, open System Settings → Privacy & Security, click **Open Anyway** next to clai and confirm. Or install from Terminal, which skips that prompt:"

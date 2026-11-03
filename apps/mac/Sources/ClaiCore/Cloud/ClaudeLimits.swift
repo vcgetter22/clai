@@ -186,10 +186,16 @@ public enum ClaudeStatusLine {
             setting["type"] = "command"
             setting["command"] = command
             out = Array(bytes[..<member.valueStart]) + Array(serialize(setting).utf8) + Array(bytes[member.valueEnd...])
+        } else if let first = all.first {
+            // Before the first member, spaced like it, so that taking it out again restores the file.
+            setting = ["type": "command", "command": command]
+            let space = Array(bytes[(all.openBrace + 1)..<first.keyStart])
+            let insert = Array(("\"statusLine\": " + serialize(setting) + ",").utf8) + space
+            out = Array(bytes[..<first.keyStart]) + insert + Array(bytes[first.keyStart...])
         } else {
             setting = ["type": "command", "command": command]
             let open = all.openBrace + 1
-            let insert = "\n  \"statusLine\": " + serialize(setting) + (all.isEmpty ? "\n" : ",")
+            let insert = "\n  \"statusLine\": " + serialize(setting) + "\n"
             out = Array(bytes[..<open]) + Array(insert.utf8) + Array(bytes[open...])
         }
         let result = String(decoding: out, as: UTF8.self)
@@ -289,6 +295,7 @@ public enum ClaudeStatusLine {
             }
         }
 
+        if b.count >= 3, b[0] == 0xEF, b[1] == 0xBB, b[2] == 0xBF { i = 3 } // a byte order mark
         skipSpace()
         guard i < b.count, b[i] == 0x7B else { return nil }
         let open = i

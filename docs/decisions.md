@@ -68,7 +68,7 @@ Researched against the tools' source and the open-source trackers (ccusage, Code
 - For models clai has no price for, the tool's own `cost` is shown, labelled "cost as logged".
 
 **Not counted (no usage logs on the Mac)**
-- Cursor, GitHub Copilot, chats on claude.ai, chatgpt.com and gemini.google.com, and cloud agents.
+- Cursor, GitHub Copilot, chats on chatgpt.com and gemini.google.com, and OpenAI's and Google's cloud agents. Claude's cloud usage is covered since 2026-11-03 (below).
 - Copilot CLI, Amp, Cline and others log usage in less regular ways and can come later, one small reader each.
 
 ## 2026-10-30: A ledger that outlives the logs
@@ -116,7 +116,7 @@ When reads happen:
 - Reads run on one serial background queue.
 - The menu bar title is written only when it changes; macOS 26 aborts on a stream of identical writes.
 
-## 2026-10-30: No API keys, no Claude plan limits for now
+## 2026-10-30: No API keys, no Claude plan limits for now (superseded 2026-11-03)
 Admin-key spend (Anthropic, OpenAI, OpenRouter, Cursor, Copilot) is left out:
 
 - Anthropic admin keys carry full organization access.
@@ -131,3 +131,26 @@ Claude's 5-hour and weekly limits have one official local source: the `rate_limi
 - **Signing.** Signed ad hoc until there is a Developer ID; the workflow signs and notarizes as soon as the secrets exist.
 - **Gatekeeper.** The download needs Open Anyway once. `curl … | sh` avoids it (curl does not quarantine) and checks the SHA-256.
 - **Updates.** The update check shows a notice and a download link. Sparkle 2 with EdDSA signatures works without a Developer ID and would make updates one click; it is the next step if updates become frequent.
+
+## 2026-11-03: Claude in the cloud
+The founder asked for cloud usage, for everything Anthropic. Researched on this date against Anthropic's documentation (platform.claude.com/docs, code.claude.com/docs). Only two official sources reach usage that leaves no log on the Mac:
+
+**Anthropic's usage report for an organization** (Usage and Cost Analytics API, `GET /v1/organizations/analytics/usage`, beta header `analytics-usage-cost-2026-08-24`).
+- Covers Claude Console organizations (with an Admin API key, or an admin's personal key not scoped to a workspace) and Claude Enterprise organizations (with an Analytics API key, scope `read:analytics`, made by the primary owner). Individual Pro and Max plans have none ("The Admin API is unavailable for individual accounts").
+- Products: `chat`, `chat_cowork_unified`, `claude_code`, `cowork`, `claude_design`, `claude_in_chrome`, `claude_tag` (Slack), `office_agent`, `messages_api`, `message_batches_api`, `managed_agents_api`, `claude_console`. clai shows them as four tools: Claude Code (cloud), Claude Cowork (cloud), Claude apps, Claude API.
+- clai asks for 1-hour buckets by model, product, context-window tier and speed, 1,000 rows a page, at most 31 days a request, never before 2026-01-01. To count one person in a shared organization it filters by `actor_ids[]`, with the user id found by e-mail address among the organization's actors of the last 31 days (grouping by actor instead would download every member's rows). Usage through legacy workspace keys is attributed to the key, not the person, so it is left out then. Every 30 minutes the last three days; twice a day from the start of last month, because the report is complete only hours later ("typically within 4 hours … up to 24 hours") and is revised for about 7 days after a month ends.
+- Rows are priced with clai's own list like local usage: `200k-1M` is the long-context tier, `speed: fast` fast mode, `message_batches_api` half price. Priority Tier commitments and US-only inference are not modelled.
+- **Never counted twice.** The report also counts Claude Code and Cowork sessions on this Mac when they belong to the organization. For those products clai keeps only what goes beyond this Mac's logs: per UTC day and model, each hour keeps its count beyond that hour's logs, a logged excess first cancels the next or previous hour (the report can put a request near the turn of an hour in the other hour), and the hours are scaled so the day keeps exactly its count beyond the day's logs. When the Mac's Claude Code runs on another account (a Max plan) at the same hour and model as the organization's, that hour is undercounted, never double counted.
+- Stored apart from the ledger, in `cloud.json` (rows per hour, product and model), because the subtraction depends on local logs that keep arriving; the summary adds the result to the ledger's lines. The report keeps a year of history, so nothing is lost by not merging it into the ledger.
+- Organization usage is billed to the organization (per token or by its Enterprise plan), not to a personal plan, so it is left out of plan value (`Tool.planVendor`).
+- The key is kept in `anthropic-org.json` with permissions 0600, not in the Keychain: with ad hoc signing every update would make macOS ask for Keychain access again (rule 3). It is sent to api.anthropic.com only, for this one endpoint. Console admin keys carry full organization access, and the settings say so by naming what the key is used for; Enterprise analytics keys are read-only.
+
+**Claude's plan limits** (Pro, Max and Ultra): the share of the 5-hour and weekly limits used. The limits count everything the account does (claude.ai, the apps, cloud sessions, Cowork, Claude Code anywhere), so they are the one figure that includes cloud usage on a personal plan.
+- The official local source is the `rate_limits` object Claude Code (2.1.80+) hands its status line command (`five_hour` and `seven_day`, each `used_percentage` and `resets_at`). The OAuth usage endpoint behind `/usage` stays off limits: reading it would mean reusing Claude Code's login.
+- Connecting in Settings sets `statusLine` in `~/.claude/settings.json` to `'<clai>' --status-line` and remembers the setting it replaced in `claude-status-line.json`. The file is edited as text, only the `statusLine` value, so the rest stays byte for byte; a file that is not a JSON object, or a link into a guarded folder, is left alone. Disconnecting puts the old setting back, unless the user changed the status line since.
+- `clai --status-line` reads the status line JSON (through `JSON.object`, so only numbers and kept keys are parsed), saves the limits to `claude-limits.json`, then runs the user's own command with the same input; its output is the status line. It exits before AppKit starts.
+- A window the JSON leaves out keeps its saved value until it resets (Claude Code has none before a session's first reply and drops a window when it resets).
+- Limits update while Claude Code runs in a terminal (the status line belongs to its terminal interface). The panel shows them while they are current: seen in the last 7 days and not all reset.
+
+**Still not counted:** individual Pro and Max usage in dollars (no report exists), and Claude Code cloud sessions of those plans unless they are teleported to the Mac (`claude --teleport` continues the session as a local transcript in `~/.claude/projects`, which the Claude Code reader counts). OpenTelemetry export from cloud environments would need a collector the cloud can reach, which means a server; not now.
+

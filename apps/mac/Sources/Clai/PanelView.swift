@@ -500,24 +500,28 @@ struct Meter: View {
 
     var body: some View {
         let used = min(100, max(0, window.usedPercent))
+        // A window that reset since: what was used in the new one is not known yet, so no figure.
+        let reset = window.resetsAt.map { $0 <= Date().timeIntervalSince1970 } ?? false
         VStack(alignment: .leading, spacing: 3) {
             HStack {
                 Text(label)
                 Spacer()
-                Text("\(Int(used.rounded()))%").monospacedDigit()
+                Text(reset ? "–" : "\(Int(used.rounded()))%").monospacedDigit()
             }
             .font(.system(size: 11, weight: .medium))
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Theme.hairline)
-                    Capsule()
-                        .fill(used >= 90 ? Theme.critical : used >= 70 ? Theme.warning : Theme.accent)
-                        .frame(width: max(3, geometry.size.width * used / 100))
+                    if !reset {
+                        Capsule()
+                            .fill(used >= 90 ? Theme.critical : used >= 70 ? Theme.warning : Theme.accent)
+                            .frame(width: max(3, geometry.size.width * used / 100))
+                    }
                 }
             }
             .frame(height: 4)
             if let resets = window.resetsAt {
-                Text("resets \(Format.resetTime(Date(timeIntervalSince1970: resets)))")
+                Text("\(reset ? "reset" : "resets") \(Format.resetTime(Date(timeIntervalSince1970: resets)))")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }

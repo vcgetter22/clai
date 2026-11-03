@@ -14,7 +14,8 @@ import FoundationNetworking
 /// have no such report.
 ///
 /// clai asks for token counts per UTC hour, model, product, context-window tier and speed, and
-/// keeps nothing else: no names or e-mail addresses, no content (the report has none).
+/// keeps nothing else: no names or e-mail addresses, no content (the report has none). To count one
+/// person's usage, it looks up their user id by e-mail address and filters by it.
 public enum OrgUsage {
     public static let endpoint = "https://api.anthropic.com/v1/organizations/analytics/usage"
     public static let betaHeader = "analytics-usage-cost-2026-08-24"
@@ -64,30 +65,36 @@ public struct OrgUsageQuery: Equatable, Sendable {
     /// Start and end of the range, whole UTC hours, at most 31 days apart.
     public var start: Double
     public var end: Double
-    /// Break usage out by who it is attributed to, to keep one person's.
-    public var byActor: Bool
+    /// Only the usage attributed to this user (`user_…`).
+    public var actorId: String?
+    /// Instead of usage: who used the organization in the range, one row per person.
+    public var actors: Bool
     /// The cursor of the page to read.
     public var page: String?
 
-    public init(start: Double, end: Double, byActor: Bool = false, page: String? = nil) {
+    public init(start: Double, end: Double, actorId: String? = nil, actors: Bool = false, page: String? = nil) {
         self.start = start
         self.end = end
-        self.byActor = byActor
+        self.actorId = actorId
+        self.actors = actors
         self.page = page
     }
 
     public var url: URL {
-        var items: [(String, String)] = [
-            ("starting_at", OrgUsage.iso(start)),
-            ("ending_at", OrgUsage.iso(end)),
-            ("time_bucket_width", "1h"),
-            ("group_by[]", "model"),
-            ("group_by[]", "product"),
-            ("group_by[]", "context_window"),
-            ("group_by[]", "speed"),
-        ]
-        if byActor { items.append(("group_by[]", "actor")) }
-        items += [("order_by", "time"), ("order", "asc"), ("limit", "1000")]
+        var items: [(String, String)] = [("starting_at", OrgUsage.iso(start)), ("ending_at", OrgUsage.iso(end))]
+        if actors {
+            items += [("group_by[]", "actor"), ("limit", "1000")]
+        } else {
+            items += [
+                ("time_bucket_width", "1h"),
+                ("group_by[]", "model"),
+                ("group_by[]", "product"),
+                ("group_by[]", "context_window"),
+                ("group_by[]", "speed"),
+            ]
+            if let actorId { items.append(("actor_ids[]", actorId)) }
+            items += [("order_by", "time"), ("order", "asc"), ("limit", "1000")]
+        }
         if let page { items.append(("page", page)) }
         let query = items.map { OrgUsageQuery.encode($0.0) + "=" + OrgUsageQuery.encode($0.1) }.joined(separator: "&")
         return URL(string: OrgUsage.endpoint + "?" + query)!
@@ -194,21 +201,15 @@ public struct OrgUsagePage: Equatable, Sendable {
     /// The report's `data_refreshed_at`: usage after it is missing or partial.
     public var refreshedAt: Double?
 
-    /// Reads a page. With `onlyEmail`, keeps the usage attributed to that person and nothing else
-    /// (the query must then group by actor). Names and addresses are compared and dropped.
-    public static func parse(_ data: Data, onlyEmail: String? = nil) throws -> OrgUsagePage {
+    /// Reads a page.
+    public static func parse(_ data: Data) throws -> OrgUsagePage {
         guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let items = object["data"] as? [Any] else { throw OrgUsageError.malformed }
-        let email = onlyEmail?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var merged: [OrgRow.Key: OrgRow] = [:]
         var order: [OrgRow.Key] = []
         for case let item as [String: Any] in items {
             guard let start = (item["starting_at"] as? String).flatMap(Timestamp.parse) else { continue }
             let group = item["group"] as? [String: Any] ?? [:]
-            if let email, !email.isEmpty {
-                let actor = group["actor"] as? [String: Any]
-                guard (actor?["email_address"] as? String)?.lowercased() == email else { continue }
-            }
             let usage = item["usage"] as? [String: Any] ?? [:]
             let writes = usage["cache_creation"] as? [String: Any] ?? [:]
             let searches = (usage["server_tool_use"] as? [String: Any])?["web_search_requests"]
@@ -247,6 +248,32 @@ public struct OrgUsagePage: Equatable, Sendable {
     }
 }
 
+/// A page of the people who used the organization (`OrgUsageQuery.actors`).
+public struct OrgActorsPage: Equatable, Sendable {
+    /// The user id of the person with this e-mail address, when the page has them.
+    public var userId: String?
+    public var hasMore: Bool
+    public var nextPage: String?
+
+    /// Reads a page and looks for `email` (compared without case). Names and the other addresses
+    /// are dropped.
+    public static func parse(_ data: Data, email: String) throws -> OrgActorsPage {
+        guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let items = object["data"] as? [Any] else { throw OrgUsageError.malformed }
+        let wanted = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        var found: String?
+        for case let item as [String: Any] in items {
+            guard let actor = (item["group"] as? [String: Any])?["actor"] as? [String: Any],
+                  (actor["email_address"] as? String)?.lowercased() == wanted,
+                  let id = actor["user_id"] as? String, !id.isEmpty else { continue }
+            found = id
+            break
+        }
+        let next = object["next_page"] as? String
+        return OrgActorsPage(userId: found, hasMore: (object["has_more"] as? Bool ?? false) && next?.isEmpty == false, nextPage: next)
+    }
+}
+
 public enum OrgUsageError: Error, Equatable, Sendable {
     /// Anthropic refused the request (a 4xx answer), with its message.
     case rejected(status: Int, message: String)
@@ -256,6 +283,8 @@ public enum OrgUsageError: Error, Equatable, Sendable {
     case offline(String)
     /// An answer clai cannot read.
     case malformed
+    /// No one with this e-mail address used the organization in the last 31 days.
+    case personNotFound(String)
 
     /// What the settings say.
     public var message: String {
@@ -275,6 +304,8 @@ public enum OrgUsageError: Error, Equatable, Sendable {
             return "Could not reach api.anthropic.com: \(reason)"
         case .malformed:
             return "Anthropic's answer could not be read; clai tries again later."
+        case .personNotFound(let email):
+            return "The report has no usage by \(email) in the last 31 days. Check the address, or clear it to count everyone."
         }
     }
 
@@ -324,13 +355,16 @@ public final class OrgUsageClient: @unchecked Sendable {
     public func usage(from start: Double, to end: Double, onlyEmail: String? = nil, now: Double = Date().timeIntervalSince1970) async throws -> (rows: [OrgRow], refreshedAt: Double?) {
         let first = OrgUsage.hourStart(max(start, OrgUsage.earliest, now - 364 * 86_400))
         let last = OrgUsage.hourStart(min(end, now))
-        let byActor = !(onlyEmail ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        var actorId: String?
+        if let email = onlyEmail?.trimmingCharacters(in: .whitespacesAndNewlines), !email.isEmpty {
+            actorId = try await userId(email: email, now: now)
+        }
         var rows: [OrgRow.Key: OrgRow] = [:]
         var refreshed: Double?
         var windowStart = first
         while windowStart < last {
             let windowEnd = min(last, windowStart + OrgUsage.maxSpan)
-            var query = OrgUsageQuery(start: windowStart, end: windowEnd, byActor: byActor)
+            var query = OrgUsageQuery(start: windowStart, end: windowEnd, actorId: actorId)
             var restarted = false
             var pages = 0
             while true {
@@ -345,7 +379,7 @@ public final class OrgUsageClient: @unchecked Sendable {
                     continue
                 }
                 guard status == 200 else { throw OrgUsageError.from(status: status, body: data) }
-                let page = try OrgUsagePage.parse(data, onlyEmail: onlyEmail)
+                let page = try OrgUsagePage.parse(data)
                 for row in page.rows {
                     if rows[row.key] == nil { rows[row.key] = row } else { rows[row.key]!.add(row) }
                 }
@@ -360,6 +394,22 @@ public final class OrgUsageClient: @unchecked Sendable {
             ($0.hour, $0.product, $0.model, $0.long ? 1 : 0, $0.fast ? 1 : 0) < ($1.hour, $1.product, $1.model, $1.long ? 1 : 0, $1.fast ? 1 : 0)
         }
         return (sorted, refreshed)
+    }
+
+    /// The user id of the person with this e-mail address, among those who used the organization
+    /// in the last 31 days (the longest range one request covers).
+    func userId(email: String, now: Double) async throws -> String {
+        let end = OrgUsage.hourStart(now)
+        var query = OrgUsageQuery(start: max(OrgUsage.earliest, end - OrgUsage.maxSpan), end: end, actors: true)
+        for _ in 0..<50 {
+            let (data, status) = try await transport(query.request(key: key, userAgent: userAgent))
+            guard status == 200 else { throw OrgUsageError.from(status: status, body: data) }
+            let page = try OrgActorsPage.parse(data, email: email)
+            if let id = page.userId { return id }
+            guard page.hasMore, let next = page.nextPage else { break }
+            query.page = next
+        }
+        throw OrgUsageError.personNotFound(email)
     }
 }
 

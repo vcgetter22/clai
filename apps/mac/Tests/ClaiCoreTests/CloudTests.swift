@@ -65,16 +65,20 @@ extension URLComponents {
 final class OrgUsageQueryTests: XCTestCase {
     func testAsksForHourlyUsageByModelAndProduct() {
         let start = Timestamp.parse("2026-10-01T00:00:00Z")!
-        let query = OrgUsageQuery(start: start, end: start + 86_400, byActor: true, page: "page_2/x+y")
+        let query = OrgUsageQuery(start: start, end: start + 86_400, actorId: "user_01", page: "page_2/x+y")
         let url = query.url.absoluteString
         XCTAssertTrue(url.hasPrefix("https://api.anthropic.com/v1/organizations/analytics/usage?"))
         XCTAssertTrue(url.contains("starting_at=2026-10-01T00%3A00%3A00Z&ending_at=2026-10-02T00%3A00%3A00Z&time_bucket_width=1h"))
-        for dimension in ["model", "product", "context_window", "speed", "actor"] {
+        for dimension in ["model", "product", "context_window", "speed"] {
             XCTAssertTrue(url.contains("group_by%5B%5D=" + dimension), dimension)
         }
+        XCTAssertTrue(url.contains("actor_ids%5B%5D=user_01"))
         XCTAssertTrue(url.contains("order_by=time&order=asc&limit=1000"))
         XCTAssertTrue(url.hasSuffix("page=page_2%2Fx%2By"))
         XCTAssertFalse(OrgUsageQuery(start: start, end: start + 3600).url.absoluteString.contains("actor"))
+        let people = OrgUsageQuery(start: start, end: start + 3600, actors: true).url.absoluteString
+        XCTAssertTrue(people.contains("group_by%5B%5D=actor&limit=1000"))
+        XCTAssertFalse(people.contains("time_bucket_width"))
 
         let request = query.request(key: "sk-ant-admin01-test", userAgent: "clai/1.1.0 (Mac)")
         XCTAssertEqual(request.value(forHTTPHeaderField: "x-api-key"), "sk-ant-admin01-test")
@@ -119,18 +123,24 @@ final class OrgUsagePageTests: XCTestCase {
         XCTAssertTrue(page.rows[2].fast)
     }
 
-    func testKeepsOnePersonsUsage() throws {
+    func testMergesRowsOfTheSameHourProductAndModel() throws {
         let data = ReportFixture.page([
-            ReportFixture.row("2026-10-29T10:00:00Z", product: "chat", model: "claude-sonnet-5-5", requests: 4, email: "Me@Example.com"),
-            ReportFixture.row("2026-10-29T10:00:00Z", product: "chat", model: "claude-sonnet-5-5", requests: 9, email: "colleague@example.com"),
-            ReportFixture.row("2026-10-29T10:00:00Z", product: "chat", model: "claude-sonnet-5-5", requests: 2, email: "me@example.com"),
+            ReportFixture.row("2026-10-29T10:00:00Z", product: "chat", model: "claude-sonnet-5-5", requests: 4),
+            ReportFixture.row("2026-10-29T10:00:00Z", product: "chat", model: "claude-sonnet-5-5", requests: 9),
             ReportFixture.row("2026-10-29T10:00:00Z", product: "messages_api", model: "claude-sonnet-5-5", requests: 5),
         ])
-        let mine = try OrgUsagePage.parse(data, onlyEmail: " me@example.com ")
-        XCTAssertEqual(mine.rows.count, 1)
-        XCTAssertEqual(mine.rows[0].requests, 6, "two rows of the same person and product are one")
-        let everyone = try OrgUsagePage.parse(data)
-        XCTAssertEqual(everyone.rows.map(\.requests), [15, 5])
+        XCTAssertEqual(try OrgUsagePage.parse(data).rows.map(\.requests), [13, 5])
+    }
+
+    func testFindsAPersonByAddress() throws {
+        let data = ReportFixture.page([
+            ReportFixture.row("2026-10-01T00:00:00Z", product: nil, model: nil, email: "colleague@example.com"),
+            ReportFixture.row("2026-10-01T00:00:00Z", product: nil, model: nil, email: "Me@Example.com"),
+        ], next: "p2")
+        let page = try OrgActorsPage.parse(data, email: " me@example.com ")
+        XCTAssertEqual(page.userId, "user_01")
+        XCTAssertTrue(page.hasMore)
+        XCTAssertNil(try OrgActorsPage.parse(data, email: "someone@else.com").userId)
     }
 
     func testRejectsWhatIsNotAPage() {
@@ -198,6 +208,33 @@ final class OrgUsageClientTests: XCTestCase {
         let result = try await client.usage(from: now - 86_400, to: now, now: now)
         XCTAssertEqual(fake.requests.count, 4)
         XCTAssertEqual(result.rows.map(\.requests), [1, 2], "the first read of the window is not counted twice")
+    }
+
+    func testCountsOnePersonWithTheirUserId() async throws {
+        let fake = FakeReport { query in
+            if query.value("group_by[]") == "actor" {
+                // The people of the organization, two pages.
+                if query.value("page") == nil {
+                    return (ReportFixture.page([ReportFixture.row("2026-10-01T00:00:00Z", product: nil, model: nil, email: "a@example.com")], next: "p2"), 200)
+                }
+                return (ReportFixture.page([ReportFixture.row("2026-10-01T00:00:00Z", product: nil, model: nil, email: "me@example.com")]), 200)
+            }
+            XCTAssertEqual(query.value("actor_ids[]"), "user_01")
+            return (ReportFixture.page([ReportFixture.row(query.value("starting_at")!, product: "chat", model: "claude-sonnet-5-5", requests: 2)]), 200)
+        }
+        let client = OrgUsageClient(key: "k", userAgent: "clai-test", transport: fake.transport)
+        let result = try await client.usage(from: now - 86_400, to: now, onlyEmail: "Me@example.com", now: now)
+        XCTAssertEqual(result.rows.map(\.requests), [2])
+        XCTAssertEqual(fake.requests.count, 3)
+        let lookup = URLComponents(url: fake.requests[0].url!, resolvingAgainstBaseURL: false)!
+        XCTAssertEqual(lookup.value("starting_at"), "2026-09-29T12:00:00Z", "the last 31 days")
+
+        do {
+            _ = try await client.usage(from: now - 86_400, to: now, onlyEmail: "nobody@example.com", now: now)
+            XCTFail("expected an error")
+        } catch let error as OrgUsageError {
+            XCTAssertEqual(error, .personNotFound("nobody@example.com"))
+        }
     }
 
     func testStopsAtTheFirstError() async {
@@ -472,6 +509,11 @@ final class ClaudeStatusLineTests: XCTestCase {
         XCTAssertTrue(text.contains(#""allow": ["Bash(git status)", "Read(~/notes/{a,b}.md)"]"#))
         XCTAssertEqual(ClaudeStatusLine.object(text)?["model"] as? String, "opus")
         XCTAssertEqual(ClaudeStatusLine.uninstall(in: text, previous: nil), original, "taking it out restores the file exactly")
+        XCTAssertTrue(text.hasPrefix("{\n  \"statusLine\": {"), "spaced like the file")
+        let compact = #"{"model":"opus","env":{"A":"1"}}"#
+        let (oneLine, _) = try ClaudeStatusLine.install(command: command, in: compact)
+        XCTAssertTrue(oneLine.hasPrefix(#"{"statusLine": {"#))
+        XCTAssertEqual(ClaudeStatusLine.uninstall(in: oneLine, previous: nil), compact)
     }
 
     func testReplacesAndRestoresTheUsersStatusLine() throws {
@@ -524,6 +566,10 @@ final class ClaudeStatusLineTests: XCTestCase {
         XCTAssertThrowsError(try ClaudeStatusLine.install(command: command, in: "{ \"a\": 1, }"))
         XCTAssertThrowsError(try ClaudeStatusLine.install(command: command, in: "// comment\n{}"))
         XCTAssertNoThrow(try ClaudeStatusLine.install(command: command, in: "  \n"))
+        let marked = "\u{FEFF}{\"model\": \"opus\"}"
+        let (text, _) = try! ClaudeStatusLine.install(command: command, in: marked)
+        XCTAssertEqual(ClaudeStatusLine.currentCommand(in: text), command)
+        XCTAssertEqual(ClaudeStatusLine.uninstall(in: text, previous: nil), marked)
     }
 
     func testRunnerSavesLimitsAndRunsTheUsersCommand() throws {

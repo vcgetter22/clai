@@ -1,11 +1,13 @@
 # clai for Mac
 
-The app: a menu bar item with this month's API-equivalent spend, and a panel with today, last month, the pace, a 30-day chart, the month by tool and by model, plan value and Codex's plan limits. Settings live in the same panel. Download: https://getclai.vercel.app
+The app: a menu bar item with this month's API-equivalent spend, and a panel with today, last month, the pace, a 30-day chart, the month by tool and by model, plan value, and Claude's and Codex's plan limits. Settings live in the same panel, including Claude in the cloud: the plan limits (through Claude Code's status line) and an organization's usage report (Anthropic's analytics API). Download: https://getclai.vercel.app
 
 ## Layout
 - `Sources/ClaiCore` (Foundation only; tests run on macOS and Linux)
   - `Readers/`: one reader per tool (Claude Code and Cowork, Codex, Gemini CLI and Qwen Code, OpenCode). Each lists its files and turns lines or documents into one `UsageEvent` per request, with a key that is the same wherever the tool repeats the request.
-  - `Scanner.swift`: finds the files, reads only what changed (appended lines, rewritten documents), keeps one event per request, and updates the ledger.
+  - `Scanner.swift`: finds the files, reads only what changed (appended lines, rewritten documents), keeps one event per request, and updates the ledger; adds the cloud lines for the summary.
+  - `Cloud/OrgUsage.swift`: Anthropic's Usage and Cost Analytics API (query, pages, client), the stored report (`cloud.json`) and the cloud lines it gives once this Mac's Claude Code and Cowork logs are taken off.
+  - `Cloud/ClaudeLimits.swift`: Claude's plan limits from Claude Code's status line JSON, the edit of `~/.claude/settings.json` that connects clai's status line command, and `clai --status-line` itself.
   - `Ledger.swift`: totals per UTC quarter hour, tool, model and price tier in `~/Library/Application Support/clai/ledger.json`; for each quarter hour and tool the count with more requests wins, so history outlives deleted logs, and days are worked out in whatever time zone the Mac is in.
   - `Pricing.swift`, `Prices.swift`: the price list (dated prices, fast mode, cache writes, long-context tiers) and how logged model ids are matched to it.
   - `Summary.swift`, `Format.swift`, `Report.swift`, `Files.swift`, `Time.swift`, `SampleData.swift`.
@@ -20,6 +22,8 @@ swift run Clai --sample --window        # sample data in a window
 swift run Clai --report                 # print what clai counts and quit
 CLAI_HOME=/tmp/fixture swift run Clai   # read logs under /tmp/fixture instead of your home
 swift run Clai --render /tmp/shots      # draw the panel (sample data) to PNGs and quit
+echo '{"rate_limits":{"five_hour":{"used_percentage":12,"resets_at":1893456000}}}' | swift run Clai --status-line
+                                        # what Claude Code runs as its status line once connected
 ```
 
 ## Package and release

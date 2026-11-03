@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>clai for Mac</title>
-    <meta name="description" content="Your AI usage in the menu bar. clai reads the logs Claude Code, Codex, Gemini CLI, Qwen Code and OpenCode keep on your Mac and prices every request at API list price. Free, open source, local." />
+    <meta name="description" content="Your AI usage in the menu bar. clai reads the logs Claude Code, Codex, Gemini CLI, Qwen Code and OpenCode keep on your Mac, adds Claude's cloud usage, and prices every request at API list price. Free, open source, local." />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#f3f7f5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b1210" media="(prefers-color-scheme: dark)" />
@@ -13,7 +13,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://getclai.vercel.app/" />
     <meta property="og:title" content="clai for Mac: your AI usage, priced, in the menu bar" />
-    <meta property="og:description" content="Prices every request Claude Code, Codex, Gemini CLI, Qwen Code and OpenCode log on your Mac, and shows what your plan is worth. Free, open source, local." />
+    <meta property="og:description" content="Prices every request Claude Code, Codex, Gemini CLI, Qwen Code and OpenCode log on your Mac, adds Claude's cloud usage, and shows what your plan is worth. Free, open source, local." />
     <meta property="og:image" content="https://getclai.vercel.app/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <script>document.documentElement.classList.add('js')</script>
@@ -81,7 +81,7 @@
           <div class="panel-wrap">
             <picture>
               <source srcset="/panel-dark.png" media="(prefers-color-scheme: dark)" />
-              <img class="panel" src="/panel-light.png" width="360" height="664" alt="The clai panel with sample data: this month so far at API list prices with today and last month, a 30-day chart, spend by tool, plan value for Claude Max and ChatGPT Pro, and Codex plan limits." />
+              <img class="panel" src="/panel-light.png" width="360" height="798" alt="The clai panel with sample data: this month so far at API list prices with today and last month, a 30-day chart, spend by tool including Claude Code in the cloud and the Claude apps, plan value for Claude Max and ChatGPT Pro, and Claude and Codex plan limits." />
             </picture>
           </div>
           <figcaption>The real panel, drawn with sample data.</figcaption>
@@ -119,7 +119,7 @@
           <article class="card reveal">
             <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 1-8 8" /><path d="M12 4v8h8" /></svg></span>
             <h3>The pace and the limits</h3>
-            <p>Where the month is heading, and how much of Codex's 5-hour and weekly limits you have used, as Codex logs them.</p>
+            <p>Where the month is heading, and how much of your Claude and Codex 5-hour and weekly limits you have used. Claude's limits count claude.ai and cloud sessions too.</p>
           </article>
           <article class="card reveal">
             <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 3v4M16 3v4M4 10h16" /></svg></span>
@@ -144,6 +144,7 @@
           <li><b>Never reads</b> your prompts, your code or the replies you get, and never looks in Desktop, Documents, Downloads or iCloud.</li>
           <li><b>Prices</b> every request at the vendor's API list price, labelled API-equivalent.</li>
           <li><b>Talks to the internet</b> once a day, to fetch the price list from this site and ask GitHub for a newer clai. You can turn that off.</li>
+          <li><b>Reads your organization's usage report</b> from Anthropic every 30 minutes, only if you connect one with a key. Nothing about your usage is ever sent.</li>
         </ul>
       </section>
 
@@ -156,8 +157,10 @@
           <li>Gemini CLI</li>
           <li>Qwen Code</li>
           <li>OpenCode</li>
+          <li>Claude plan limits</li>
+          <li>Claude Console and Enterprise usage reports</li>
         </ul>
-        <p class="section-lede">Chats on claude.ai, chatgpt.com and gemini.google.com, Cursor, GitHub Copilot and agents that run in the cloud keep no usage logs on your Mac, so clai cannot count them.</p>
+        <p class="section-lede">Claude in the cloud: your Claude plan limits count claude.ai, the apps and cloud sessions, and an organization's usage report from Anthropic prices them by the hour. Chats on chatgpt.com and gemini.google.com, Cursor and GitHub Copilot keep no usage logs on your Mac, so clai cannot count them.</p>
       </section>
 
       <section class="section split reveal" id="terminal" aria-labelledby="terminal-title">
@@ -186,7 +189,8 @@
           </details>
           <details>
             <summary>Does clai count claude.ai, ChatGPT and cloud sessions?</summary>
-            <p>No. clai counts the AI tools that run on your Mac and log their usage there. Chats on claude.ai, chatgpt.com or gemini.google.com, and Claude Code or Codex sessions that run in the vendor's cloud, leave no logs on your Mac, and the vendors offer no public usage API for consumer plans.</p>
+            <p>Claude's, through Anthropic's two official sources, both off until you turn them on in Settings. <b>Claude plan limits</b> show how much of your Pro or Max 5-hour and weekly limits you have used, and they count everything: claude.ai, the Claude apps, cloud sessions and Claude Code. Claude Code hands them to its status line; clai becomes that status line command, runs yours as before, and puts it back when you turn the switch off. For a <b>Claude Console or Claude Enterprise organization</b>, paste an Admin or Analytics API key and clai prices the organization's claude.ai chats, cloud sessions, Cowork, Claude Design, Slack and API usage from Anthropic's usage report, without counting this Mac's Claude Code twice.</p>
+            <p>Individual Pro and Max plans have no usage report, so their chats and cloud sessions cannot be priced in dollars. ChatGPT and Gemini on the web are not counted: their vendors offer no usage API for consumer plans.</p>
           </details>
           <details>
             <summary>Apple silicon or Intel?</summary>
