@@ -456,7 +456,15 @@ final class AppState: ObservableObject {
             statusLineNote = "Claude Code's settings file is in a folder macOS protects, so clai leaves it alone."
             return
         }
-        let text = try? String(contentsOfFile: path, encoding: .utf8)
+        // A missing file is created; one that exists but cannot be read is never written over.
+        var text: String?
+        if FileManager.default.fileExists(atPath: path) {
+            guard let read = try? String(contentsOfFile: path, encoding: .utf8) else {
+                statusLineNote = "clai could not read ~/.claude/settings.json, so it leaves it alone."
+                return
+            }
+            text = read
+        }
         do {
             let (updated, installed) = try ClaudeStatusLine.connect(executable: executable, settings: text,
                                                                      remembered: ClaudeStatusLine.Installed.load(from: AppState.statusLineFile))
@@ -473,13 +481,19 @@ final class AppState: ObservableObject {
     }
 
     func disconnectStatusLine() {
-        if let path = AppState.claudeSettingsPath(), let text = try? String(contentsOfFile: path, encoding: .utf8),
-           let restored = ClaudeStatusLine.disconnect(settings: text, remembered: ClaudeStatusLine.Installed.load(from: AppState.statusLineFile)) {
-            do {
-                try AppState.writeSettings(restored, to: path)
-            } catch {
-                statusLineNote = "clai could not change ~/.claude/settings.json: \(error.localizedDescription)"
+        if let path = AppState.claudeSettingsPath(), FileManager.default.fileExists(atPath: path) {
+            guard let text = try? String(contentsOfFile: path, encoding: .utf8) else {
+                statusLineNote = "clai could not read ~/.claude/settings.json, so it changed nothing."
                 return
+            }
+            // Nil when the status line is no longer clai's: then the user's setting stays as it is.
+            if let restored = ClaudeStatusLine.disconnect(settings: text, remembered: ClaudeStatusLine.Installed.load(from: AppState.statusLineFile)) {
+                do {
+                    try AppState.writeSettings(restored, to: path)
+                } catch {
+                    statusLineNote = "clai could not change ~/.claude/settings.json: \(error.localizedDescription)"
+                    return
+                }
             }
         }
         try? FileManager.default.removeItem(at: AppState.statusLineFile)
