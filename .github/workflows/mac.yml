@@ -1,7 +1,8 @@
 name: mac
 # clai for Mac: tests (macOS and Linux), the universal app, a smoke test of the packaged app and
 # screenshots. A `mac-v*` tag publishes clai-mac.dmg, clai-mac.zip and checksums.txt as a GitHub
-# release, which getclai.vercel.app/download links to.
+# release, which getclai.vercel.app/download links to. So does a manual run with a `release`
+# version, which creates the `mac-v<version>` tag on the commit it built.
 on:
   push:
     branches: [main, 'claude/**']
@@ -17,6 +18,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish this build as release mac-v<version>, e.g. 1.1.0. Empty: a test build.'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -75,9 +81,14 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-        # A release build takes its version from the tag: mac-v1.0.1 builds 1.0.1.
+          RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.release || '' }}
+        # A release build takes its version from the tag (mac-v1.0.1 builds 1.0.1) or the manual run's input.
         run: |
           if [[ "$GITHUB_REF" == refs/tags/mac-v* ]]; then export VERSION="${GITHUB_REF#refs/tags/mac-v}"; fi
+          if [[ -n "$RELEASE" ]]; then
+            [[ "$RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "release must be a version like 1.1.0, not '$RELEASE'"; exit 1; }
+            export VERSION="$RELEASE"
+          fi
           apps/mac/scripts/build-app.sh
       - name: Smoke test
         run: apps/mac/scripts/smoke-test.sh
@@ -98,7 +109,7 @@ jobs:
           if-no-files-found: ignore
 
   release:
-    if: startsWith(github.ref, 'refs/tags/mac-v')
+    if: startsWith(github.ref, 'refs/tags/mac-v') || (github.event_name == 'workflow_dispatch' && inputs.release != '')
     needs: app
     runs-on: ubuntu-latest
     permissions:
@@ -115,8 +126,9 @@ jobs:
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ startsWith(github.ref, 'refs/tags/mac-v') && github.ref_name || format('mac-v{0}', inputs.release) }}
         run: |
+          [[ "$TAG" =~ ^mac-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "not a release tag: $TAG"; exit 1; }
           VERSION="${TAG#mac-v}"
           {
             echo "clai for Mac $VERSION: your AI usage in the menu bar, priced at API list prices from the logs Claude Code, Codex, Gemini CLI, Qwen Code and OpenCode keep on your Mac, with Claude's plan limits and an organization's usage report from Anthropic. Usage data stays on your Mac."
@@ -144,6 +156,9 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "clai for Mac $VERSION" --notes-file notes.md
-          else
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
             gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "clai for Mac $VERSION" --notes-file notes.md --verify-tag
+          else
+            # A manual run: the tag is created on the commit that was built.
+            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "clai for Mac $VERSION" --notes-file notes.md --target "$GITHUB_SHA"
           fi
