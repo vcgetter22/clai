@@ -32,8 +32,6 @@ public enum SampleData {
             add(.codex, "gpt-6.1-sol", requests: 180, input: 3_500, output: 1_100, read: 48_000, write: 0)
             if offset % 3 == 0 { add(.gemini, "gemini-3.1-pro-preview", requests: 60, input: 9_000, output: 700, read: 30_000, write: 0) }
             if offset % 4 == 1 { add(.cowork, "claude-sonnet-5-5", requests: 90, input: 80, output: 700, read: 40_000, write: 1_800) }
-            if offset % 2 == 0 { add(.claudeCodeCloud, "claude-opus-5-5", requests: 140, input: 60, output: 950, read: 58_000, write: 2_600) }
-            add(.claudeApps, "claude-sonnet-5-5", requests: 30, input: 1_200, output: 900, read: 24_000, write: 3_000)
         }
         return Ledger(buckets: buckets)
     }
@@ -42,7 +40,16 @@ public enum SampleData {
     public static func summary(now: Date = Date(), timeZone: TimeZone = .current, pricer: Pricer = Pricer(list: .builtIn)) -> Summary {
         var days = DayResolver(timeZone: timeZone)
         let today = days.day(at: now.timeIntervalSince1970)
-        return Summary.make(ledger: ledger(today: today, timeZone: timeZone), pricer: pricer, now: now.timeIntervalSince1970, days: &days)
+        var summary = Summary.make(ledger: ledger(today: today, timeZone: timeZone), pricer: pricer, now: now.timeIntervalSince1970, days: &days)
+        // As a Max plan with claude.ai and cloud sessions besides Claude Code on this Mac would show it.
+        var estimate = ClaudeEstimate(
+            dollarsPerPoint: 4.2, stretches: 18, points: 46,
+            week: ClaudeEstimate.Week(used: 48, resets: now.timeIntervalSince1970 + 2.5 * 86_400, total: 201.6, local: 88.4, beyond: 113.2)
+        )
+        estimate.todayBeyond = 18.3
+        estimate.monthBeyond = 96.5
+        summary.claudeEstimate = estimate
+        return summary
     }
 
     public static let sources: [SourceStatus] = [

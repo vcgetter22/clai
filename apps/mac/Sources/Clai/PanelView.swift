@@ -109,7 +109,7 @@ struct Overview: View {
                 Breakdown(summary: state.summary)
                 PlanValue(state: state)
                 if let limits = state.claudeLimits, limits.isCurrent || state.isSample {
-                    LimitsRow(title: "Claude plan limits", limits: limits)
+                    LimitsRow(title: "Claude plan limits", limits: limits, estimate: state.summary.claudeEstimate)
                         .help("Your whole plan: claude.ai, the Claude apps, cloud sessions and Claude Code, as Claude Code last saw it.")
                 }
                 if let limits = state.codexLimits, limits.isCurrent || state.isSample {
@@ -193,6 +193,12 @@ struct MonthCard: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.white.opacity(0.78))
                 .help("What these requests would cost at the vendors' API list prices. With a subscription you pay the plan, not this.")
+            if let estimate = summary.claudeEstimate, estimate.isReady, estimate.monthBeyond >= 0.5 {
+                Text("≈ \(Format.usd(estimate.monthBeyond)) more on claude.ai and in the cloud, estimated")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.78))
+                    .help("What your Claude use beyond this Mac's logs would cost at API list prices, estimated from your weekly plan limit. It is not part of the figure above.")
+            }
             HStack(alignment: .firstTextBaseline) {
                 CardFigure(label: "Today", value: summary.todayCost, unpriced: summary.todayUnpriced)
                 Spacer()
@@ -444,6 +450,12 @@ struct PlanValue: View {
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
+                            if plan.vendor == .anthropic, let estimate = state.summary.claudeEstimate, estimate.isReady, estimate.monthBeyond >= 0.5 {
+                                Text("≈ \(Format.multiple((value + estimate.monthBeyond) / plan.monthly)) with claude.ai and the cloud, estimated")
+                                    .font(.system(size: 10.5))
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
                         }
                         Spacer()
                         Text(Format.multiple(value / plan.monthly))
@@ -463,6 +475,8 @@ struct PlanValue: View {
 struct LimitsRow: View {
     let title: String
     let limits: RateLimits
+    /// Claude's: what all use is worth, estimated from the weekly limit.
+    var estimate: ClaudeEstimate? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -480,6 +494,9 @@ struct LimitsRow: View {
                 if let primary = limits.primary { Meter(label: windowName(primary, fallback: "5 hours"), window: primary) }
                 if let secondary = limits.secondary { Meter(label: windowName(secondary, fallback: "Week"), window: secondary) }
             }
+            if let estimate {
+                EstimateLine(estimate: estimate)
+            }
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.platter))
@@ -491,6 +508,43 @@ struct LimitsRow: View {
         if minutes % 1440 == 0 { return "\(minutes / 1440) days" }
         if minutes % 60 == 0 { return "\(minutes / 60) hours" }
         return "\(minutes) min"
+    }
+}
+
+/// What the week's Claude use is worth at API prices, estimated from the weekly limit.
+struct EstimateLine: View {
+    let estimate: ClaudeEstimate
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let rate = estimate.dollarsPerPoint {
+                if let week = estimate.week {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("This week, all Claude use")
+                        Spacer()
+                        Text("≈ \(Format.usd(week.total))").monospacedDigit()
+                    }
+                    .font(.system(size: 11.5, weight: .medium))
+                    Text("≈ \(Format.usd(week.beyond)) of it beyond this Mac · 1% of the week ≈ \(Format.usd(rate))")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                } else {
+                    Text("1% of the week ≈ \(Format.usd(rate)) at API prices")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            } else {
+                Text("Measuring what 1% of your week is worth at API prices. It takes a few sessions of Claude Code in Terminal.")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.top, 2)
+        .accessibilityElement(children: .combine)
+        .help("An estimate: clai measures what 1% of your week costs at API prices on Claude Code here, and scales the week's percent. Anthropic does not publish what a percent of a plan is worth.")
     }
 }
 

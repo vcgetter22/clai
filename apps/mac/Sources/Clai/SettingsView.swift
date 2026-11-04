@@ -26,7 +26,7 @@ struct SettingsPage: View {
             }
 
             SettingsSection(title: "Claude plan limits",
-                            caption: "Pro and Max limits count everything: claude.ai, the Claude apps, cloud sessions and Claude Code. Claude Code hands them to its status line; clai adds itself there, runs your own status line as before, and shows the limits while you use Claude Code in Terminal.") {
+                            caption: "Pro and Max limits count everything: claude.ai, the Claude apps, cloud sessions and Claude Code. Claude Code hands them to its status line; clai adds itself there, runs your own status line as before, and shows the limits while you use Claude Code in Terminal. From how far your Claude Code use here moves the weekly limit, clai also estimates what the rest is worth at API prices.") {
                 SwitchRow(title: "Show Claude plan limits", isOn: Binding(
                     get: { state.statusLineConnected },
                     set: { on in

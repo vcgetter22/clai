@@ -48,6 +48,17 @@ public enum Report {
             out.append("")
             out.append("Claude limits: " + limitWindows(limits) + " (as of \(OrgUsage.iso(limits.observedAt)))")
         }
+        if let estimate = s.claudeEstimate {
+            if let rate = estimate.dollarsPerPoint {
+                out.append("Claude estimate: 1% of the week ≈ \(Format.usd(rate)) at API prices, from \(Format.count(estimate.stretches, "stretch", "stretches")) of local use (\(Format.count(Int(estimate.points.rounded()), "point")))")
+                if let week = estimate.week {
+                    out.append("  this week ≈ \(Format.usd(week.total)) in all, ≈ \(Format.usd(week.beyond)) beyond this Mac (\(Int(week.used.rounded()))% of the week used)")
+                }
+                out.append("  this month ≈ \(Format.usd(estimate.monthBeyond)) beyond this Mac, today ≈ \(Format.usd(estimate.todayBeyond))")
+            } else {
+                out.append("Claude estimate: still measuring (\(Format.count(estimate.stretches, "stretch", "stretches")) of local use so far, 3 needed)")
+            }
+        }
         if let limits = result.codexLimits {
             out.append("")
             out.append("Codex limits: " + limitWindows(limits) + (limits.planType.map { " (\($0))" } ?? ""))

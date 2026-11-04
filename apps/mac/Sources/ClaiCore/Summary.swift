@@ -79,6 +79,9 @@ public struct Summary: Sendable, Equatable {
     public var vendorMonthCost: [Vendor: Double]
     /// The last day with any usage, nil before the first.
     public var lastUsageDay: Day?
+    /// What claude.ai and cloud sessions used on a Pro or Max plan, estimated from the weekly
+    /// limit; never part of the figures above.
+    public var claudeEstimate: ClaudeEstimate? = nil
 
     public var isEmpty: Bool { lastUsageDay == nil }
 
@@ -177,6 +180,16 @@ public struct Summary: Sendable, Equatable {
             vendorMonthCost: vendors,
             lastUsageDay: lastUsage
         )
+    }
+
+    /// The cost of one request at the list price of its day (or its logged cost).
+    static func cost(of event: UsageEvent, on day: Day, pricer: Pricer) -> Double {
+        if let match = pricer.match(event.model) {
+            let price = match.price(on: day)
+            return price.cost(of: event.tokens, long: price.isLong(event.tokens), fast: event.fast && (price.fast ?? 1) > 1)
+                + Double(event.webSearches) * pricer.list.webSearchPer1k / 1000
+        }
+        return event.loggedCost ?? 0
     }
 
     /// The cost of one ledger line and how it was priced.

@@ -121,6 +121,8 @@ final class AppState: ObservableObject {
     static var orgFile: URL { supportFolder.appendingPathComponent("anthropic-org.json") }
     /// Claude's plan limits, written by `clai --status-line`.
     static var claudeLimitsFile: URL { supportFolder.appendingPathComponent("claude-limits.json") }
+    /// Each move of Claude's weekly limit, for the estimate of the use beyond this Mac.
+    static var claudeLimitsHistoryFile: URL { supportFolder.appendingPathComponent("claude-limits-history.jsonl") }
     /// The status line setting clai replaced in Claude Code's settings.
     static var statusLineFile: URL { supportFolder.appendingPathComponent("claude-status-line.json") }
 
@@ -138,7 +140,7 @@ final class AppState: ObservableObject {
         } else {
             // The ledger is loaded on the scan queue; the first read shows what it knows at once.
             scanner = UsageScanner(home: AppState.home, ledgerURL: AppState.supportFolder.appendingPathComponent("ledger.json"),
-                                   cloudURL: AppState.cloudFile)
+                                   cloudURL: AppState.cloudFile, limitsHistoryURL: AppState.claudeLimitsHistoryFile)
             var days = DayResolver(timeZone: .current)
             summary = .empty(today: days.day(at: Date().timeIntervalSince1970))
         }
@@ -498,7 +500,9 @@ final class AppState: ObservableObject {
         }
         try? FileManager.default.removeItem(at: AppState.statusLineFile)
         try? FileManager.default.removeItem(at: AppState.claudeLimitsFile)
+        try? FileManager.default.removeItem(at: AppState.claudeLimitsHistoryFile)
         claudeLimits = nil
+        refresh()
         statusLineConnected = false
         statusLineNote = nil
     }

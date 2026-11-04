@@ -83,6 +83,8 @@ public final class UsageScanner: @unchecked Sendable {
     public let readers: [LogReader]
     public let ledgerURL: URL?
     public let cloudURL: URL?
+    /// Claude's weekly limit readings (`claude-limits-history.jsonl`), for the plan estimate.
+    public let limitsHistoryURL: URL?
 
     private struct FileState {
         var stamp: FileStamp
@@ -101,6 +103,10 @@ public final class UsageScanner: @unchecked Sendable {
     /// The report's usage beyond this Mac's logs, worked out again when either changes.
     private var cloudLines: [BucketKey: BucketValue] = [:]
     private var cloudIsStale = true
+    private var readings: [LimitReading] = []
+    private var readingsStamp: FileStamp?
+    private var localClaude: ClaudeEstimator.Local?
+    private var historyTrimmed = false
     /// Seconds between writes of the ledger. What is not written yet is still in the logs, which
     /// the next launch reads again, so a later write loses nothing.
     public var saveInterval: Double = 300
@@ -114,11 +120,12 @@ public final class UsageScanner: @unchecked Sendable {
     private var completeSince: [Tool: Double] = [:]
     private var days = DayResolver(timeZone: TimeZone(identifier: "UTC")!)
 
-    public init(home: String, readers: [LogReader] = LogReaders.all, ledgerURL: URL?, cloudURL: URL? = nil) {
+    public init(home: String, readers: [LogReader] = LogReaders.all, ledgerURL: URL?, cloudURL: URL? = nil, limitsHistoryURL: URL? = nil) {
         self.home = home
         self.readers = readers
         self.ledgerURL = ledgerURL
         self.cloudURL = cloudURL
+        self.limitsHistoryURL = limitsHistoryURL
     }
 
     /// The summary from the stored ledger alone: what the panel shows before the first read.
@@ -237,6 +244,7 @@ public final class UsageScanner: @unchecked Sendable {
                 unsaved = true
                 cloudIsStale = true
             }
+            localClaude = nil
             liveIsDirty = false
             lastPrices = pricesKey
             lastTimeZone = timeZone.identifier
@@ -250,7 +258,8 @@ public final class UsageScanner: @unchecked Sendable {
             lastSave = Date()
         }
 
-        let summary = Summary.make(ledger: withCloud(), pricer: pricer, now: now.timeIntervalSince1970, days: &days)
+        var summary = Summary.make(ledger: withCloud(), pricer: pricer, now: now.timeIntervalSince1970, days: &days)
+        summary.claudeEstimate = claudeEstimate(pricer: pricer, now: now.timeIntervalSince1970)
         return ScanResult(
             summary: summary,
             sources: sourceStatus(),
@@ -276,6 +285,31 @@ public final class UsageScanner: @unchecked Sendable {
             state.offset = state.stamp.size
         }
         return (state, found)
+    }
+
+    /// The plan estimate from the weekly limit readings and this Mac's Claude use; nil without readings.
+    private func claudeEstimate(pricer: Pricer, now: Double) -> ClaudeEstimate? {
+        guard let url = limitsHistoryURL else { return nil }
+        if !historyTrimmed {
+            LimitHistory.trim(url, now: now)
+            historyTrimmed = true
+        }
+        let stamp = FileStamp.of(url.path)
+        if stamp != readingsStamp {
+            readings = stamp == nil ? [] : LimitHistory.load(from: url, since: now - 40 * 86_400)
+            readingsStamp = stamp
+        }
+        guard !readings.isEmpty else { return nil }
+        if localClaude == nil {
+            var requests: [(time: Double, cost: Double)] = []
+            for event in events.values where event.tool == .claudeCode || event.tool == .cowork {
+                requests.append((event.time, Summary.cost(of: event, on: days.day(at: event.time), pricer: pricer)))
+            }
+            localClaude = ClaudeEstimator.Local(requests)
+        }
+        // This Mac's logs reach back about 30 days (Claude Code's default); weeks before that are left out.
+        let estimate = ClaudeEstimator.estimate(readings: readings, local: localClaude!, since: now - 38 * 86_400, now: now)
+        return estimate?.withDays(now: now, days: &days)
     }
 
     /// The folders every reader looks in, for watching them.

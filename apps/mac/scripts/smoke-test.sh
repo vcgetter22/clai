@@ -56,8 +56,11 @@ status='{"model":{"id":"claude-opus-5-5"},"rate_limits":{"five_hour":{"used_perc
 out="$(printf '%s' "$status" | CLAI_HOME="$HOME_DIR" "$BIN" --status-line)"
 [[ "$out" == "my-status-line" ]] || fail "the status line printed '$out'"
 grep -q '"used":23.5' "$SUPPORT/claude-limits.json" || fail "the limits were not saved"
-CLAI_HOME="$HOME_DIR" "$BIN" --report | grep -q 'Claude limits: 24% of 300 min' || fail "the report has no Claude limits"
-echo "status line passed through, limits saved"
+test -s "$SUPPORT/claude-limits-history.jsonl" || fail "the weekly reading was not recorded"
+report="$(CLAI_HOME="$HOME_DIR" "$BIN" --report)"
+grep -q 'Claude limits: 24% of 300 min' <<<"$report" || fail "the report has no Claude limits"
+grep -q 'Claude estimate: still measuring' <<<"$report" || fail "the report has no Claude estimate"
+echo "status line passed through, limits saved, weekly reading recorded"
 
 step "Launch"
 CLAI_HOME="$HOME_DIR" "$BIN" &

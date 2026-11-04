@@ -341,11 +341,16 @@ public enum StatusLineRunner {
     /// Saves the plan limits in `input` (the JSON Claude Code passes) and runs the user's own
     /// status line command with the same input; its output is the status line. Returns the exit
     /// status. Never fails because of clai: without a command of the user's, the status line is empty.
-    public static func run(input: Data, limitsURL: URL, installedURL: URL, now: Double = Date().timeIntervalSince1970,
-                           output: FileHandle? = nil) -> Int32 {
+    public static func run(input: Data, limitsURL: URL, installedURL: URL, historyURL: URL? = nil,
+                           now: Double = Date().timeIntervalSince1970, output: FileHandle? = nil) -> Int32 {
         if let limits = ClaudeLimits.parse(statusLine: input, now: now) {
-            let merged = ClaudeLimits.merge(limits, over: ClaudeLimits.load(from: limitsURL), now: now)
-            try? ClaudeLimits.save(merged, to: limitsURL)
+            let old = ClaudeLimits.load(from: limitsURL)
+            try? ClaudeLimits.save(ClaudeLimits.merge(limits, over: old, now: now), to: limitsURL)
+            // Each move of the weekly limit, for the estimate of what claude.ai and the cloud used.
+            if let historyURL, let week = limits.secondary, let resets = week.resetsAt,
+               old?.secondary?.usedPercent != week.usedPercent || old?.secondary?.resetsAt != resets {
+                LimitHistory.append(LimitReading(time: now, weekUsed: week.usedPercent, weekResets: resets), to: historyURL)
+            }
         }
         guard let command = ClaudeStatusLine.Installed.load(from: installedURL)?.previousCommand else { return 0 }
         let process = Process()
