@@ -52,7 +52,8 @@ step "Status line"
 SUPPORT="$HOME_DIR/Library/Application Support/clai"
 mkdir -p "$SUPPORT"
 printf '%s' '{"command":"clai --status-line","previous":"{\"type\":\"command\",\"command\":\"printf my-status-line\"}"}' > "$SUPPORT/claude-status-line.json"
-status='{"model":{"id":"claude-opus-5-5"},"rate_limits":{"five_hour":{"used_percentage":23.5,"resets_at":1893456000},"seven_day":{"used_percentage":41.2,"resets_at":1893456000}}}'
+resets=$(( $(date +%s) + 3 * 86400 ))
+status='{"model":{"id":"claude-opus-5-5"},"rate_limits":{"five_hour":{"used_percentage":23.5,"resets_at":'"$resets"'},"seven_day":{"used_percentage":41.2,"resets_at":'"$resets"'}}}'
 out="$(printf '%s' "$status" | CLAI_HOME="$HOME_DIR" "$BIN" --status-line)"
 [[ "$out" == "my-status-line" ]] || fail "the status line printed '$out'"
 grep -q '"used":23.5' "$SUPPORT/claude-limits.json" || fail "the limits were not saved"
